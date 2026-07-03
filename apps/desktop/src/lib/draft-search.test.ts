@@ -21,6 +21,10 @@ describe("firstNonEmptyLine", () => {
     expect(firstNonEmptyLine("\n\n  **Hello** \nworld")).toBe("Hello");
   });
 
+  it("returns null when formatting renders the first source line empty", () => {
+    expect(firstNonEmptyLine("**  **\n")).toBeNull();
+  });
+
   it("returns null when every line is blank", () => {
     expect(firstNonEmptyLine("   \n\t\n")).toBeNull();
     expect(firstNonEmptyLine("")).toBeNull();
@@ -75,7 +79,7 @@ describe("matchDraft", () => {
     const match = matchDraft("Title\nThis mentions **keyword** in bold", "keyword");
     expect(match).not.toBeNull();
     expect(match?.titleRanges).toEqual([]);
-    expect(match?.snippet?.text).toContain("keyword");
+    expect(match?.snippet?.text).toBe("Title This mentions keyword in bold");
     expect(match?.snippet?.ranges).toEqual([{ start: 20, end: 27 }]);
   });
 

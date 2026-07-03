@@ -174,6 +174,9 @@ function domPointInNode(node: Node, visibleOffset: number): DomPoint | null {
   let cursor = 0;
   for (const child of node.childNodes) {
     const length = visibleLength(child);
+    if (length === 0) {
+      continue;
+    }
     if (visibleOffset <= cursor + length) {
       return domPointInNode(child, visibleOffset - cursor);
     }
@@ -241,6 +244,9 @@ function serializeNode(node: Node): string {
   if (!isElement(node) || isEditorMarker(node)) {
     return "";
   }
+  if (node.tagName === "BR") {
+    return "\n";
+  }
 
   const inner = Array.from(node.childNodes).map(serializeNode).join("");
   const mark = node.getAttribute("data-editor-mark");
@@ -260,10 +266,19 @@ function serializeNode(node: Node): string {
     const url = node.getAttribute("data-editor-url") ?? "url";
     return `[${inner}](${url})`;
   }
-  if (node.tagName === "BR") {
+  return inner;
+}
+
+function isPlaceholderBreak(node: Node): boolean {
+  return isElement(node) && node.tagName === "BR";
+}
+
+function serializeContent(content: Element): string {
+  const child = content.firstChild;
+  if (child !== null && content.childNodes.length === 1 && isPlaceholderBreak(child)) {
     return "";
   }
-  return inner;
+  return serializeNode(content);
 }
 
 function serializeEditor(root: HTMLElement): string {
@@ -271,7 +286,7 @@ function serializeEditor(root: HTMLElement): string {
     .map((line) => {
       const marker = line.getAttribute("data-source-marker") ?? "";
       const content = line.querySelector("[data-editor-content='true']");
-      return `${marker}${content === null ? "" : serializeNode(content)}`;
+      return `${marker}${content === null ? "" : serializeContent(content)}`;
     })
     .join("\n");
 }
@@ -283,7 +298,7 @@ function markerLabel(line: MarkdownLine): string | null {
     case "numbered":
       return line.marker.trim();
     case "check":
-      return "□";
+      return /^- \[[xX]\] /.test(line.marker) ? "☑" : "□";
     case "quote":
     case "plain":
       return null;
@@ -397,6 +412,9 @@ export function Editor({
   }, [value]);
 
   function handleInput(): void {
+    if (readOnly) {
+      return;
+    }
     const editor = editorRef.current;
     if (editor === null) {
       return;
@@ -406,6 +424,9 @@ export function Editor({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (readOnly) {
+      return;
+    }
     if (event.key !== "Enter" || event.metaKey || event.altKey || event.ctrlKey) {
       return;
     }

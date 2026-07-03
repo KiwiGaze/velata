@@ -131,7 +131,7 @@ export function DraftRow({
           ref={titleRef}
           className={cn("line-clamp-2 text-[13px] leading-[1.45]", isEmpty && "text-ink-3")}
         >
-          {sourceTitle === null
+          {isEmpty || sourceTitle === null
             ? label
             : renderFormattedTitle(sourceTitle, match?.titleRanges ?? [])}
         </span>

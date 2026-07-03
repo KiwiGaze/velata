@@ -88,7 +88,7 @@ export function matchDraft(text: string, query: string): DraftMatch | null {
   if (windowStart > 0) {
     snippetText = `…${snippetText}`;
   }
-  if (windowEnd < text.length) {
+  if (windowEnd < visibleText.length) {
     snippetText = `${snippetText}…`;
   }
 
