@@ -158,10 +158,10 @@
 
           <!-- Model -->
           <div class="pane" data-pane="model">
-            <h2>Model</h2><div class="subtitle">Bring your own key. Any OpenAI-compatible endpoint works.</div>
+            <h2>Model</h2><div class="subtitle">Local mode uses any OpenAI-compatible endpoint.</div>
             <div class="row"><div><div class="lab">Provider</div></div><div class="ctl"><select class="select w-md"><option>GLM (Zhipu)</option><option>OpenAI</option><option>Cerebras</option><option>Kimi (Moonshot)</option><option>Custom…</option></select></div></div>
             <div class="row stack"><div class="lab">API base URL</div><input class="input" value="https://open.bigmodel.cn/api/paas/v4"></div>
-            <div class="row stack"><div style="display:flex;align-items:baseline;justify-content:space-between"><div class="lab">API key</div><span class="link" id="reveal">Show</span></div><input class="input" id="key" type="password" value="sk-············································"><div class="desc">Stored in your device keychain. It only ever goes to your provider — never to us.</div></div>
+            <div class="row stack"><div style="display:flex;align-items:baseline;justify-content:space-between"><div class="lab">API key</div><span class="link" id="reveal">Show</span></div><input class="input" id="key" type="password" value="sk-············································"><div class="desc">Stored in your device keychain. Local-mode requests go only to this endpoint, never to Velata.</div></div>
             <div class="row"><div><div class="lab">Model</div></div><div class="ctl"><select class="select w-md"><option>glm-4-plus</option><option>glm-4</option><option>gpt-4.1</option><option>custom…</option></select></div></div>
             <div class="row"><div><div class="lab">Connection</div></div><div class="ctl"><span class="status" id="testStatus">not tested</span><button class="btn ghost sm" id="testBtn">Test</button></div></div>
           </div>
@@ -250,7 +250,7 @@ Rules:
 
         <button class="btn primary">Start using Velata</button>
         <div class="laterlink"><span class="link">I’ll add a key later</span></div>
-        <div class="reassure">No microphone access · your key never leaves this device</div>
+        <div class="reassure">Local mode today · no microphone access · key stored in Keychain</div>
       </div>
     </div>
 
@@ -258,7 +258,7 @@ Rules:
     <div class="screen" data-scr="menubar">
       <div class="menuwrap"><div class="callout"></div>
         <div class="menu">
-          <div class="menu-head"><span class="b">velata</span><span class="s">GLM-4 · local</span></div>
+          <div class="menu-head"><span class="b">velata</span><span class="s">GLM-4 · local mode</span></div>
           <div class="msep"></div>
           <div class="mitem"><span>Open Velata</span><span class="kc">⌘⇧Space</span></div>
           <div class="mitem"><span>New draft</span><span class="kc">⌘⇧N</span></div>

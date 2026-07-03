@@ -19,9 +19,10 @@ Only the latest release receives security fixes.
 
 ## Security model
 
-Understanding what Velata does and does not do helps scope reports:
+Understanding what Velata does and does not do today helps scope reports:
 
-- **Bring your own key.** Refine requests go directly from the app to the OpenAI-compatible endpoint you configure. There is no Velata server in between.
+- **Local mode is the current shipped mode.** Drafts and settings stay on the device. Velata Cloud sync is planned as a future opt-in mode, but it is not implemented in this release.
+- **Bring your own key.** Refine requests go directly from the app to the OpenAI-compatible endpoint you configure. There is no Velata server in between for refine calls.
 - **The API key is stored only in the macOS Keychain** (service `com.velata.app`). It is never written to `settings.json`, logs, or disk.
 - **Clipboard only.** Velata writes refined text to the clipboard and hides its window. It never simulates keystrokes and never injects text into other applications.
 - **The refine prompt treats input as text to clean, never as instructions to execute.**

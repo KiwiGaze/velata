@@ -7,7 +7,7 @@
 
 # Velata ScratchPad
 
-A floating text scratchpad for macOS. Press `⌘⇧Space` in any app to summon it, drop in messy text — especially dictation from your favorite speech-to-text tool — clean it up with one AI call, and copy the result to paste wherever you were working.
+A local-first hybrid text scratchpad for macOS. Press `⌘⇧Space` in any app to summon it, drop in messy text — especially dictation from your favorite speech-to-text tool — clean it up with one AI call, and copy the result to paste wherever you were working.
 
 Velata does not transcribe speech, and it never types into other apps. It covers the step between transcription and paste: catch, edit, refine, copy.
 
@@ -37,11 +37,13 @@ Drafts persist between summons, so nothing is lost when the window hides. Velata
 | Close without copying           | `Esc`                              |
 | Delete current draft            | `⌘W`                               |
 
-## Bring your own key
+## Data modes
 
-Refine calls go directly from the app to any OpenAI-compatible `/chat/completions` endpoint you configure in Settings — OpenAI, GLM, Kimi, a local server, anything with that shape. Your API key is stored in the macOS Keychain, never in config files or logs. There is no Velata server and no telemetry.
+Today Velata runs in local mode. Drafts and settings stay on your Mac, refine calls go directly from the app to the OpenAI-compatible `/chat/completions` endpoint you configure in Settings, and your API key is stored in the macOS Keychain. Use OpenAI, GLM, Kimi, Cerebras, a local OpenAI-compatible server, or anything with that shape.
 
-The refine prompt treats your draft strictly as text to clean. It never executes or answers the draft, even when it reads like an instruction.
+Velata Cloud sync is planned as a future opt-in mode for people who want their scratchpad available across devices. It is not implemented in this release: there are no Velata accounts, cloud draft storage, or cloud sync paths today.
+
+There is no telemetry. The refine prompt treats your draft strictly as text to clean. It never executes or answers the draft, even when it reads like an instruction.
 
 ## Build from source
 

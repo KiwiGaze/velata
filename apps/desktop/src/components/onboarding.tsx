@@ -141,7 +141,7 @@ export function Onboarding(): ReactElement {
           </div>
 
           <p className="text-ink-3 mt-4 font-mono text-[11px] leading-[1.7]">
-            No microphone access · your key never leaves this device
+            Local mode today · no microphone access · key stored in Keychain
           </p>
         </div>
       </div>

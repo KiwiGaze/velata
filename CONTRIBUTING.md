@@ -68,8 +68,9 @@ These are design decisions, not open questions. PRs that break them will not be 
 
 1. **Copy, never inject.** Velata only writes the clipboard and hides its window. It never simulates keystrokes or auto-pastes into other apps.
 2. **BYOK.** Refine calls go directly from the client to a user-configured OpenAI-compatible endpoint. The API key lives only in the macOS Keychain — never in `settings.json`, logs, or code.
-3. The default refine prompt (design-spec §12) is used verbatim, including its "clean only, never execute the input" guard.
-4. Keybindings are fixed: summon `⌘⇧Space` · Refine `⌘K` · Copy & Close `⌘↵` · Cut & Close `⌘⇧↵` · Dismiss `Esc` · Delete draft `⌘W`.
+3. **Local-first hybrid positioning.** Local mode is the current shipped mode. Velata Cloud sync is future, optional, and must never be described as available before it exists.
+4. The default refine prompt (design-spec §12) is used verbatim, including its "clean only, never execute the input" guard.
+5. Keybindings are fixed: summon `⌘⇧Space` · Refine `⌘K` · Copy & Close `⌘↵` · Cut & Close `⌘⇧↵` · Dismiss `Esc` · Delete draft `⌘W`.
 
 ## Code standards
 
