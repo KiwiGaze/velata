@@ -9,6 +9,7 @@ import { DiffOverlay } from "@/components/diff-overlay";
 import { DraftsRail } from "@/components/drafts-rail";
 import { Editor } from "@/components/editor";
 import { FooterHints, type Hint } from "@/components/footer-hints";
+import { FormattingToolbar } from "@/components/formatting-toolbar";
 import { InstructionPalette } from "@/components/instruction-palette";
 import { ProgressLine } from "@/components/progress-line";
 import { ResizeHandles } from "@/components/resize-handles";
@@ -16,6 +17,7 @@ import { useDrafts } from "@/hooks/use-drafts";
 import { MissingApiKeyError, MissingModelError, useRefine } from "@/hooks/use-refine";
 import { useScratchpadKeys } from "@/hooks/use-scratchpad-keys";
 import { useSettings } from "@/hooks/use-settings";
+import { type FormatAction, planFormat } from "@/lib/apply-format";
 import { TARGET_OPTIONS, targetLanguageLabel, toTargetLanguage } from "@/lib/target-language";
 
 type Phase =
@@ -56,6 +58,7 @@ export function ScratchPad(): ReactElement {
     useDrafts();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [railOpen, setRailOpen] = useState(false);
+  const [formattingOpen, setFormattingOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -127,6 +130,32 @@ export function ScratchPad(): ReactElement {
     if (phase.kind === "refined" || phase.kind === "error") {
       setPhase({ kind: "idle" });
     }
+  }
+
+  function handleApplyFormat(action: FormatAction): void {
+    const textarea = editorRef.current;
+    if (textarea === null || phase.kind === "refining") {
+      return;
+    }
+    const plan = planFormat(activeText, textarea.selectionStart, textarea.selectionEnd, action);
+    textarea.focus();
+    textarea.setSelectionRange(plan.replaceStart, plan.replaceEnd);
+    /* eslint-disable @typescript-eslint/no-deprecated */
+    const applied =
+      plan.insert.length > 0
+        ? document.execCommand("insertText", false, plan.insert)
+        : plan.replaceEnd > plan.replaceStart
+          ? document.execCommand("delete")
+          : true;
+    /* eslint-enable @typescript-eslint/no-deprecated */
+    if (!applied) {
+      handleTextChange(
+        `${activeText.slice(0, plan.replaceStart)}${plan.insert}${activeText.slice(plan.replaceEnd)}`,
+      );
+    }
+    requestAnimationFrame(() => {
+      editorRef.current?.setSelectionRange(plan.selectionStart, plan.selectionEnd);
+    });
   }
 
   function handleRefine(chosen: Instruction = instruction): void {
@@ -324,9 +353,13 @@ export function ScratchPad(): ReactElement {
             open={railOpen}
             drafts={drafts}
             activeId={activeId}
+            formattingOpen={formattingOpen}
             onSelect={handleSelectDraft}
             onDelete={handleDeleteDraft}
             onCreate={handleCreateDraft}
+            onToggleFormatting={() => {
+              setFormattingOpen((open) => !open);
+            }}
           />
 
           <div className="flex min-w-0 flex-1 flex-col">
@@ -343,6 +376,11 @@ export function ScratchPad(): ReactElement {
                     after={activeText}
                     onDismiss={handleDismissDiff}
                   />
+                ) : undefined
+              }
+              toolbar={
+                formattingOpen && phase.kind !== "refining" && phase.kind !== "refined" ? (
+                  <FormattingToolbar onApply={handleApplyFormat} />
                 ) : undefined
               }
             />
