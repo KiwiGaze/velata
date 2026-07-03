@@ -102,11 +102,14 @@ export function ScratchPad(): ReactElement {
   }, [resetTransient, createDraft]);
 
   const handleSummon = useCallback((): void => {
+    if (settings.summonBehavior === "recent-draft") {
+      return;
+    }
     if (settings.reuseEmptyDraft && isBlank(activeText)) {
       return;
     }
     handleCreateDraft();
-  }, [settings.reuseEmptyDraft, activeText, handleCreateDraft]);
+  }, [settings.summonBehavior, settings.reuseEmptyDraft, activeText, handleCreateDraft]);
 
   function handleSelectDraft(id: string): void {
     resetTransient();

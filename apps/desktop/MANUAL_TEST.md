@@ -71,16 +71,20 @@ dark menu bars, and that the gap between the two panes stays visible at menu-bar
    truncated one → tooltip shows the full text.
 3. ⌘1–9 switches; the active draft is highlighted. ⌘W deletes the current one (the list is never
    empty). Summoning with an empty current draft reuses it (setting: "Reuse empty draft on open").
-4. Quit and relaunch → your drafts are still there (persisted, debounced writes).
-5. **Search:** type in the search field → the list filters to drafts whose title OR body contains
+4. Settings → Drafts → **When summoned: Most recent draft** → type into a draft, hide with Esc,
+   press ⌘⇧Space → the same draft is open again and nothing new was created. Switch back to
+   **New draft** → each summon starts a fresh draft again. The tray **New draft** item always
+   creates one regardless of this setting.
+5. Quit and relaunch → your drafts are still there (persisted, debounced writes).
+6. **Search:** type in the search field → the list filters to drafts whose title OR body contains
    the query. Matched substrings render emphasized (semibold + underline, still zero-color — no
    yellow), and each hit shows a one-line body snippet with `…` around the first body match.
    Clicking **New draft** while a query is active clears the search so the new empty draft shows.
-6. The **X** button (shown only while the field has text) clears the query. In the search field,
+7. The **X** button (shown only while the field has text) clears the query. In the search field,
    **Esc** clears a non-empty query and keeps the window open; pressing **Esc** again on the now
    empty field hides the window as usual.
-7. A query that matches nothing shows `No matching drafts` in place of the list.
-8. The **Formatting** row at the rail bottom toggles its pressed styling (`aria-pressed`) on each
+8. A query that matches nothing shows `No matching drafts` in place of the list.
+9. The **Formatting** row at the rail bottom toggles its pressed styling (`aria-pressed`) on each
    click. The floating toolbar it opens is covered in a later section.
 
 ## 6. Instruction palette (⌘P)
@@ -101,7 +105,8 @@ palette only (does not hide the window).
    set a model, click **Test** → `✓ connected` or `✗ <error>`.
 4. **Refine:** add/edit/delete instructions; exactly one stays "Default for ⌘K"; deleting the
    default promotes another; the last one can't be deleted.
-5. **Drafts / Shortcuts:** toggles persist; the shortcut list is read-only.
+5. **Drafts / Shortcuts:** the toggles and the "When summoned" choice persist; the shortcut list
+   is read-only.
 
 ## 8. Theme / polish (visual)
 

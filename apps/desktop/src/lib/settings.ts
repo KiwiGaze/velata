@@ -1,6 +1,9 @@
 import { load } from "@tauri-apps/plugin-store";
 import { DEFAULT_INSTRUCTION, type Instruction } from "@velata/core";
 
+/** What summoning the panel opens: a fresh draft or the draft last worked on. */
+export type SummonBehavior = "new-draft" | "recent-draft";
+
 /** Non-secret application settings persisted to the settings store. */
 export interface AppSettings {
   launchAtLogin: boolean;
@@ -8,6 +11,7 @@ export interface AppSettings {
   baseUrl: string;
   model: string;
   instructions: Instruction[];
+  summonBehavior: SummonBehavior;
   reuseEmptyDraft: boolean;
   keepDraftHistory: boolean;
   onboarded: boolean;
@@ -20,6 +24,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   baseUrl: "",
   model: "",
   instructions: [DEFAULT_INSTRUCTION],
+  summonBehavior: "new-draft",
   reuseEmptyDraft: true,
   keepDraftHistory: true,
   onboarded: false,
