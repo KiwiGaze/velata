@@ -86,7 +86,7 @@
   --color-sidebar-ring: var(--sidebar-ring);
 
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", system-ui,
+    -apple-system, blinkmacsystemfont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", system-ui,
     sans-serif;
   --font-mono: "SF Mono", ui-monospace, monospace;
 

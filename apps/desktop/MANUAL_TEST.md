@@ -153,12 +153,12 @@ be verified on a real GUI session.
    showing `***` markers.
 4. **Code:** select text → click **Code** → it renders as inline code; clicking again unwraps.
 5. **Bulleted list:** put the caret on a line → click **Bulleted list** → the line renders with a
-   bullet marker, not a raw `- ` prefix; click again → the bullet is removed.
+   bullet marker, not a raw `-` prefix; click again → the bullet is removed.
 6. **Numbered list:** select several lines → click **Numbered list** → they render as numbered
    rows; click again → the numbers are stripped from the stored source.
 7. **Checklist:** with the caret on a line → click **Checklist** → the line renders with a checkbox.
 8. **Quote:** with the caret on a line → click **Quote** → the line renders as a quote, without a raw
-   `> ` prefix.
+   `>` prefix.
 9. **Empty-line no-op:** put the caret on a blank line → click any list or quote button → the text is
    unchanged (in particular, no preceding newline is deleted).
 10. **Link:** select `foo` → click **Link** → `foo` renders as a link-styled label while refine/copy

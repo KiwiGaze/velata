@@ -134,7 +134,7 @@ export function DraftRow({
             isEmpty && "text-ink-3",
           )}
         >
-          {sourceTitle === null
+          {isEmpty || sourceTitle === null
             ? label
             : renderFormattedTitle(sourceTitle, match?.titleRanges ?? [])}
         </span>
