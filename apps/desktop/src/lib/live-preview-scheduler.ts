@@ -7,6 +7,7 @@ export type PreviewPhase = "idle" | "refreshing" | "ready" | "error";
 export interface PreviewState {
   text: string;
   phase: PreviewPhase;
+  draftKey: string;
   errorMessage?: string;
 }
 
@@ -60,7 +61,7 @@ export function createLivePreviewScheduler(
   let text = "";
 
   function emit(phase: PreviewPhase, errorMessage?: string): void {
-    onState({ text, phase, ...(errorMessage === undefined ? {} : { errorMessage }) });
+    onState({ text, phase, draftKey, ...(errorMessage === undefined ? {} : { errorMessage }) });
   }
 
   function cancel(): void {

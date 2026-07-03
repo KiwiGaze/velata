@@ -338,7 +338,11 @@ export function ScratchPad(): ReactElement {
 
   function handleCopyClose(): void {
     void (async () => {
-      await writeText(splitMode ? previewCopyText(preview, activeText) : activeText);
+      await writeText(
+        splitMode && preview.draftKey === activeId
+          ? previewCopyText(preview, activeText)
+          : activeText,
+      );
       if (!settings.keepDraftHistory) {
         handleDeleteActive();
       }
@@ -348,7 +352,11 @@ export function ScratchPad(): ReactElement {
 
   function handleCutClose(): void {
     void (async () => {
-      await writeText(splitMode ? previewCopyText(preview, activeText) : activeText);
+      await writeText(
+        splitMode && preview.draftKey === activeId
+          ? previewCopyText(preview, activeText)
+          : activeText,
+      );
       handleDeleteActive();
       await invoke("hide_scratchpad");
     })();

@@ -93,7 +93,7 @@ describe("createLivePreviewScheduler", () => {
     expect(calls[0]?.input).toBe("draft one more");
     calls[0]?.deferred.resolve("refined");
     await flush();
-    expect(states.at(-1)).toEqual({ text: "refined", phase: "ready" });
+    expect(states.at(-1)).toEqual({ text: "refined", phase: "ready", draftKey: "d1" });
   });
 
   it("restarts the debounce when the source changes", () => {
@@ -144,7 +144,7 @@ describe("createLivePreviewScheduler", () => {
   it("clears immediately on blank source without a request", () => {
     const { states, calls, scheduler } = makeHarness();
     scheduler.schedule("   \n ", CLEAN, "d1");
-    expect(states.at(-1)).toEqual({ text: "", phase: "idle" });
+    expect(states.at(-1)).toEqual({ text: "", phase: "idle", draftKey: "d1" });
     vi.advanceTimersByTime(PREVIEW_DEBOUNCE_MS);
     expect(calls).toHaveLength(0);
   });
@@ -166,7 +166,7 @@ describe("createLivePreviewScheduler", () => {
     await flush();
     calls[0]?.deferred.resolve("first");
     await flush();
-    expect(states.at(-1)).toEqual({ text: "second", phase: "ready" });
+    expect(states.at(-1)).toEqual({ text: "second", phase: "ready", draftKey: "d1" });
   });
 
   it("drops a resolve that lands after reset, even for the same draft", async () => {
@@ -175,7 +175,7 @@ describe("createLivePreviewScheduler", () => {
     scheduler.reset("d1");
     calls[0]?.deferred.resolve("stale");
     await flush();
-    expect(states.at(-1)).toEqual({ text: "", phase: "idle" });
+    expect(states.at(-1)).toEqual({ text: "", phase: "idle", draftKey: "d1" });
   });
 
   it("drops a resolve that lands after a draft switch", async () => {
@@ -184,7 +184,7 @@ describe("createLivePreviewScheduler", () => {
     scheduler.reset("d2");
     calls[0]?.deferred.resolve("stale");
     await flush();
-    expect(states.at(-1)).toEqual({ text: "", phase: "idle" });
+    expect(states.at(-1)).toEqual({ text: "", phase: "idle", draftKey: "d2" });
   });
 
   it("reset clears the unchanged-skip cache so the same source re-refines", async () => {
@@ -216,7 +216,7 @@ describe("createLivePreviewScheduler", () => {
     scheduler.refreshNow("draft", STRUCTURE, "d1");
     calls[0]?.deferred.resolve("# Title\n- a");
     await flush();
-    expect(states.at(-1)).toEqual({ text: "**Title**\n- a", phase: "ready" });
+    expect(states.at(-1)).toEqual({ text: "**Title**\n- a", phase: "ready", draftKey: "d1" });
   });
 
   it("does not normalize clean output", async () => {
@@ -224,7 +224,7 @@ describe("createLivePreviewScheduler", () => {
     scheduler.refreshNow("draft", CLEAN, "d1");
     calls[0]?.deferred.resolve("# Title");
     await flush();
-    expect(states.at(-1)).toEqual({ text: "# Title", phase: "ready" });
+    expect(states.at(-1)).toEqual({ text: "# Title", phase: "ready", draftKey: "d1" });
   });
 
   it("maps missing-config errors to the connect message", async () => {
@@ -237,6 +237,7 @@ describe("createLivePreviewScheduler", () => {
     expect(states.at(-1)).toEqual({
       text: "",
       phase: "error",
+      draftKey: "d1",
       errorMessage: "Connect a model in Settings",
     });
   });
@@ -249,7 +250,12 @@ describe("createLivePreviewScheduler", () => {
     scheduler.refreshNow("draft two", CLEAN, "d1");
     calls[1]?.deferred.reject(new Error("boom"));
     await flush();
-    expect(states.at(-1)).toEqual({ text: "refined", phase: "error", errorMessage: "boom" });
+    expect(states.at(-1)).toEqual({
+      text: "refined",
+      phase: "error",
+      draftKey: "d1",
+      errorMessage: "boom",
+    });
     vi.advanceTimersByTime(PREVIEW_DEBOUNCE_MS);
     expect(calls).toHaveLength(2);
   });
@@ -259,21 +265,28 @@ describe("previewCopyText", () => {
   const source = "raw source";
 
   it("copies a ready preview", () => {
-    expect(previewCopyText({ text: "refined", phase: "ready" }, source)).toBe("refined");
+    expect(previewCopyText({ text: "refined", phase: "ready", draftKey: "d1" }, source)).toBe(
+      "refined",
+    );
   });
 
   it("copies the previous result while refreshing", () => {
-    expect(previewCopyText({ text: "refined", phase: "refreshing" }, source)).toBe("refined");
+    expect(previewCopyText({ text: "refined", phase: "refreshing", draftKey: "d1" }, source)).toBe(
+      "refined",
+    );
   });
 
   it("falls back to source while refreshing with no prior result", () => {
-    expect(previewCopyText({ text: "", phase: "refreshing" }, source)).toBe(source);
+    expect(previewCopyText({ text: "", phase: "refreshing", draftKey: "d1" }, source)).toBe(source);
   });
 
   it("falls back to source on error and idle", () => {
-    expect(previewCopyText({ text: "refined", phase: "error", errorMessage: "boom" }, source)).toBe(
-      source,
-    );
-    expect(previewCopyText({ text: "", phase: "idle" }, source)).toBe(source);
+    expect(
+      previewCopyText(
+        { text: "refined", phase: "error", draftKey: "d1", errorMessage: "boom" },
+        source,
+      ),
+    ).toBe(source);
+    expect(previewCopyText({ text: "", phase: "idle", draftKey: "d1" }, source)).toBe(source);
   });
 });

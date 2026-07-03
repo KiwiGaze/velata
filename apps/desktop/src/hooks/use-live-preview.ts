@@ -45,7 +45,7 @@ function sameInstruction(tracked: TrackedInputs, instruction: Instruction): bool
  */
 export function useLivePreview(inputs: LivePreviewInputs): LivePreview {
   const { enabled, source, draftId, instruction, refine } = inputs;
-  const [state, setState] = useState<PreviewState>({ text: "", phase: "idle" });
+  const [state, setState] = useState<PreviewState>({ text: "", phase: "idle", draftKey: "" });
   const refineRef = useRef<RefineFn>(refine);
   const schedulerRef = useRef<LivePreviewScheduler | null>(null);
   const trackedRef = useRef<TrackedInputs | null>(null);
