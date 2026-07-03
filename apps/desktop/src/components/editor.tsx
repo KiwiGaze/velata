@@ -144,7 +144,7 @@ function visibleOffsetFromDomPoint(root: HTMLElement, node: Node, offset: number
   return cursor;
 }
 
-function getVisibleSelection(root: HTMLElement): VisibleSelection {
+function getVisibleSelection(root: HTMLElement, fallbackEnd: number): VisibleSelection {
   const selection = window.getSelection();
   if (selection === null || selection.rangeCount === 0) {
     return { start: 0, end: 0 };
@@ -152,7 +152,7 @@ function getVisibleSelection(root: HTMLElement): VisibleSelection {
   const anchor = selection.anchorNode;
   const focus = selection.focusNode;
   if (anchor === null || focus === null || !root.contains(anchor) || !root.contains(focus)) {
-    return { start: 0, end: visibleLength(root) };
+    return { start: 0, end: fallbackEnd };
   }
 
   const anchorOffset = visibleOffsetFromDomPoint(root, anchor, selection.anchorOffset);
@@ -230,7 +230,7 @@ function setVisibleSelection(root: HTMLElement, start: number, end: number): voi
 }
 
 function sourceSelectionFromDom(root: HTMLElement, document: FormattedMarkdown): EditorSelection {
-  const selection = getVisibleSelection(root);
+  const selection = getVisibleSelection(root, document.visibleText.length);
   return {
     start: sourceOffsetFromVisibleOffset(document, selection.start),
     end: sourceOffsetFromVisibleOffset(document, selection.end),
@@ -372,6 +372,7 @@ export function Editor({
 }: EditorProps): ReactElement {
   const editorRef = useRef<HTMLDivElement>(null);
   const pendingSelectionRef = useRef<VisibleSelection | null>(null);
+  const composingRef = useRef(false);
   const formatted = useMemo(() => parseFormattedMarkdown(value), [value]);
 
   useImperativeHandle(
@@ -411,7 +412,7 @@ export function Editor({
     setVisibleSelection(editor, pendingSelection.start, pendingSelection.end);
   }, [value]);
 
-  function handleInput(): void {
+  function syncEditor(): void {
     if (readOnly) {
       return;
     }
@@ -419,12 +420,27 @@ export function Editor({
     if (editor === null) {
       return;
     }
-    pendingSelectionRef.current = getVisibleSelection(editor);
+    pendingSelectionRef.current = getVisibleSelection(editor, formatted.visibleText.length);
     onChange(serializeEditor(editor));
+  }
+
+  function handleInput(): void {
+    if (composingRef.current) {
+      return;
+    }
+    syncEditor();
+  }
+
+  function handleCompositionEnd(): void {
+    composingRef.current = false;
+    syncEditor();
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     if (readOnly) {
+      return;
+    }
+    if (event.nativeEvent.isComposing) {
       return;
     }
     if (event.key !== "Enter" || event.metaKey || event.altKey || event.ctrlKey) {
@@ -450,6 +466,10 @@ export function Editor({
         contentEditable={!readOnly}
         suppressContentEditableWarning
         tabIndex={0}
+        onCompositionStart={() => {
+          composingRef.current = true;
+        }}
+        onCompositionEnd={handleCompositionEnd}
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         className={cn(

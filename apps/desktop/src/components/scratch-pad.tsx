@@ -222,6 +222,7 @@ export function ScratchPad(): ReactElement {
     if (phase.kind === "refined") {
       updateActiveText(phase.previous);
       setPhase({ kind: "idle" });
+      focusEditor();
       return;
     }
     if (formatUndo === null) {
@@ -381,7 +382,7 @@ export function ScratchPad(): ReactElement {
               ) : undefined
             }
             toolbar={
-              formattingOpen && phase.kind !== "refining" && phase.kind !== "refined" ? (
+              formattingOpen && phase.kind !== "refining" ? (
                 <FormattingToolbar onApply={handleApplyFormat} />
               ) : undefined
             }

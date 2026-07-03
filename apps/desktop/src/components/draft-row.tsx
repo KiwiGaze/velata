@@ -3,13 +3,8 @@ import { Trash2 } from "lucide-react";
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { type Draft } from "@/hooks/use-drafts";
-import {
-  type DraftMatch,
-  firstNonEmptyLine,
-  firstNonEmptySourceLine,
-  type HighlightRange,
-} from "@/lib/draft-search";
-import { type MarkdownRun, parseFormattedMarkdown } from "@/lib/markdown-format";
+import { type DraftMatch, firstNonEmptySourceLine, type HighlightRange } from "@/lib/draft-search";
+import { type MarkdownLine, type MarkdownRun, parseFormattedMarkdown } from "@/lib/markdown-format";
 import { formatRelativeTime } from "@/lib/relative-time";
 
 interface DraftRowProps {
@@ -75,9 +70,8 @@ function renderFormattedRun(
   return <span className={className}>{content}</span>;
 }
 
-function renderFormattedTitle(source: string, ranges: HighlightRange[]): ReactNode {
-  const line = parseFormattedMarkdown(source).lines[0];
-  if (line === undefined || line.runs.length === 0) {
+function renderFormattedTitle(line: MarkdownLine, ranges: HighlightRange[]): ReactNode {
+  if (line.runs.length === 0) {
     return "";
   }
   let visibleStart = 0;
@@ -101,9 +95,11 @@ export function DraftRow({
   const [truncated, setTruncated] = useState(false);
 
   const sourceTitle = firstNonEmptySourceLine(draft.text);
-  const title = firstNonEmptyLine(draft.text);
-  const isEmpty = title === null;
-  const label = title ?? "New draft";
+  const formattedTitle = sourceTitle === null ? null : parseFormattedMarkdown(sourceTitle);
+  const titleLine = formattedTitle?.lines[0] ?? null;
+  const title = formattedTitle?.visibleText.trim() ?? "";
+  const isEmpty = title.length === 0;
+  const label = isEmpty ? "New draft" : title;
   const snippet = match?.snippet ?? null;
 
   useEffect(() => {
@@ -134,9 +130,9 @@ export function DraftRow({
             isEmpty && "text-ink-3",
           )}
         >
-          {isEmpty || sourceTitle === null
+          {isEmpty || titleLine === null
             ? label
-            : renderFormattedTitle(sourceTitle, match?.titleRanges ?? [])}
+            : renderFormattedTitle(titleLine, match?.titleRanges ?? [])}
         </span>
         <span className="text-ink-3 max-w-full truncate font-mono text-[10.5px] font-normal">
           {formatRelativeTime(draft.updatedAt, now)}
