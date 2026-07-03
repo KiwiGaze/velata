@@ -1,10 +1,21 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import {
+  currentMonitor,
+  getCurrentWindow,
+  LogicalPosition,
+  LogicalSize,
+} from "@tauri-apps/api/window";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { DEFAULT_INSTRUCTION, type Instruction, isBlank } from "@velata/core";
-import { Button, Select, SelectContent, SelectItem, SelectTrigger } from "@velata/ui";
+import {
+  DEFAULT_INSTRUCTION,
+  type Instruction,
+  isBlank,
+  STRUCTURE_INSTRUCTION,
+} from "@velata/core";
+import { Button, cn, Select, SelectContent, SelectItem, SelectTrigger } from "@velata/ui";
 import { X } from "lucide-react";
-import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { DiffOverlay } from "@/components/diff-overlay";
 import { DraftsRail } from "@/components/drafts-rail";
@@ -12,13 +23,16 @@ import { Editor, type EditorHandle } from "@/components/editor";
 import { FooterHints, type Hint } from "@/components/footer-hints";
 import { FormattingToolbar } from "@/components/formatting-toolbar";
 import { InstructionPalette } from "@/components/instruction-palette";
+import { type PreviewMode, PreviewPane } from "@/components/preview-pane";
 import { ProgressLine } from "@/components/progress-line";
 import { ResizeHandles } from "@/components/resize-handles";
 import { useDrafts } from "@/hooks/use-drafts";
+import { useLivePreview } from "@/hooks/use-live-preview";
 import { MissingApiKeyError, MissingModelError, useRefine } from "@/hooks/use-refine";
 import { useScratchpadKeys } from "@/hooks/use-scratchpad-keys";
 import { useSettings } from "@/hooks/use-settings";
 import { type FormatAction, planFormat } from "@/lib/apply-format";
+import { previewCopyText } from "@/lib/live-preview-scheduler";
 import { TARGET_OPTIONS, targetLanguageLabel, toTargetLanguage } from "@/lib/target-language";
 
 type Phase =
@@ -34,6 +48,14 @@ const DEFAULT_HINTS: readonly Hint[] = [
 ];
 
 const REFINING_HINTS: readonly Hint[] = [{ keyLabel: "esc", label: "Cancel" }];
+
+const SPLIT_HINTS: readonly Hint[] = [
+  { keyLabel: "⌘K", label: "Refresh" },
+  { keyLabel: "⌘↵", label: "Copy Refined & Close" },
+  { keyLabel: "esc", label: "Dismiss", className: "@max-[22rem]:hidden" },
+];
+
+const SPLIT_MIN_WIDTH = 1000;
 
 const ERROR_MAX_LENGTH = 80;
 
@@ -66,6 +88,9 @@ export function ScratchPad(): ReactElement {
     selectionStart: number;
     selectionEnd: number;
   } | null>(null);
+  const [splitMode, setSplitMode] = useState(false);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("clean");
+  const preSplitWidthRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const editorRef = useRef<EditorHandle | null>(null);
 
@@ -79,6 +104,22 @@ export function ScratchPad(): ReactElement {
     settings.instructions.find((entry) => entry.isDefault) ?? DEFAULT_INSTRUCTION;
   const refining = phase.kind === "refining";
   const model = settings.model.length > 0 ? settings.model : "No model";
+
+  const previewInstruction = useMemo<Instruction>(
+    () =>
+      previewMode === "structure"
+        ? { ...STRUCTURE_INSTRUCTION, targetLanguage: instruction.targetLanguage }
+        : instruction,
+    [previewMode, instruction],
+  );
+
+  const preview = useLivePreview({
+    enabled: splitMode,
+    source: activeText,
+    draftId: activeId,
+    instruction: previewInstruction,
+    refine,
+  });
 
   const setTargetLanguage = useCallback(
     (value: string): void => {
@@ -246,9 +287,58 @@ export function ScratchPad(): ReactElement {
     focusEditor();
   }
 
+  async function enterSplitSize(): Promise<void> {
+    const appWindow = getCurrentWindow();
+    const [scaleFactor, position, size, monitor] = await Promise.all([
+      appWindow.scaleFactor(),
+      appWindow.outerPosition(),
+      appWindow.outerSize(),
+      currentMonitor(),
+    ]);
+    const logicalPosition = position.toLogical(scaleFactor);
+    const logicalSize = size.toLogical(scaleFactor);
+    preSplitWidthRef.current = logicalSize.width;
+    const width = Math.max(SPLIT_MIN_WIDTH, logicalSize.width);
+    await appWindow.setSize(new LogicalSize(width, logicalSize.height));
+    if (monitor === null) {
+      return;
+    }
+    const monitorPosition = monitor.position.toLogical(monitor.scaleFactor);
+    const monitorSize = monitor.size.toLogical(monitor.scaleFactor);
+    const rightEdge = monitorPosition.x + monitorSize.width;
+    if (logicalPosition.x + width > rightEdge) {
+      const x = Math.max(monitorPosition.x, rightEdge - width);
+      await appWindow.setPosition(new LogicalPosition(x, logicalPosition.y));
+    }
+  }
+
+  async function leaveSplitSize(): Promise<void> {
+    const width = preSplitWidthRef.current;
+    if (width === null) {
+      return;
+    }
+    preSplitWidthRef.current = null;
+    const appWindow = getCurrentWindow();
+    const [scaleFactor, size] = await Promise.all([appWindow.scaleFactor(), appWindow.outerSize()]);
+    const logicalSize = size.toLogical(scaleFactor);
+    await appWindow.setSize(new LogicalSize(width, logicalSize.height));
+  }
+
+  function handleToggleSplit(): void {
+    if (splitMode) {
+      setSplitMode(false);
+      void leaveSplitSize();
+      return;
+    }
+    resetTransient();
+    setRailOpen(false);
+    setSplitMode(true);
+    void enterSplitSize();
+  }
+
   function handleCopyClose(): void {
     void (async () => {
-      await writeText(activeText);
+      await writeText(splitMode ? previewCopyText(preview, activeText) : activeText);
       if (!settings.keepDraftHistory) {
         handleDeleteActive();
       }
@@ -258,7 +348,7 @@ export function ScratchPad(): ReactElement {
 
   function handleCutClose(): void {
     void (async () => {
-      await writeText(activeText);
+      await writeText(splitMode ? previewCopyText(preview, activeText) : activeText);
       handleDeleteActive();
       await invoke("hide_scratchpad");
     })();
@@ -302,7 +392,13 @@ export function ScratchPad(): ReactElement {
   }, [focusEditor]);
 
   useScratchpadKeys({
-    onRefine: handleRefine,
+    onRefine: () => {
+      if (splitMode) {
+        preview.refreshNow();
+        return;
+      }
+      handleRefine();
+    },
     onCopyClose: handleCopyClose,
     onCutClose: handleCutClose,
     onDismiss: handleDismiss,
@@ -310,7 +406,9 @@ export function ScratchPad(): ReactElement {
     onDeleteActive: handleDeleteActive,
     onSelectIndex: handleSelectIndex,
     onOpenPalette: () => {
-      setPaletteOpen(true);
+      if (!splitMode) {
+        setPaletteOpen(true);
+      }
     },
     onOpenSettings: () => {
       void invoke("open_settings");
@@ -371,6 +469,18 @@ export function ScratchPad(): ReactElement {
             <Button
               type="button"
               variant="ghost"
+              onClick={handleToggleSplit}
+              aria-pressed={splitMode}
+              className={cn(
+                "hover:bg-raise hover:text-ink h-auto rounded-[7px] border-0 bg-transparent px-2 py-[5px] font-mono text-[11px] transition-colors",
+                splitMode ? "bg-raise text-ink" : "text-ink-3",
+              )}
+            >
+              Split
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
               onClick={handleDismiss}
               aria-label="Close"
               className="text-ink-3 hover:bg-raise hover:text-ink size-7 rounded-[7px] border-0 bg-transparent p-0 transition-colors"
@@ -379,27 +489,40 @@ export function ScratchPad(): ReactElement {
             </Button>
           </div>
 
-          <Editor
-            ref={editorRef}
-            value={activeText}
-            onChange={handleTextChange}
-            dimmed={refining}
-            readOnly={refining}
-            overlay={
-              phase.kind === "refined" ? (
-                <DiffOverlay
-                  before={phase.previous}
-                  after={activeText}
-                  onDismiss={handleDismissDiff}
-                />
-              ) : undefined
-            }
-            toolbar={
-              formattingOpen && phase.kind !== "refining" ? (
-                <FormattingToolbar onApply={handleApplyFormat} />
-              ) : undefined
-            }
-          />
+          <div className="flex min-h-0 flex-1">
+            <Editor
+              ref={editorRef}
+              value={activeText}
+              onChange={handleTextChange}
+              dimmed={refining}
+              readOnly={refining}
+              overlay={
+                phase.kind === "refined" ? (
+                  <DiffOverlay
+                    before={phase.previous}
+                    after={activeText}
+                    onDismiss={handleDismissDiff}
+                  />
+                ) : undefined
+              }
+              toolbar={
+                formattingOpen && phase.kind !== "refining" ? (
+                  <FormattingToolbar onApply={handleApplyFormat} />
+                ) : undefined
+              }
+            />
+            {splitMode ? (
+              <PreviewPane
+                text={preview.text}
+                mode={previewMode}
+                phase={preview.phase}
+                {...(preview.errorMessage === undefined
+                  ? {}
+                  : { errorMessage: preview.errorMessage })}
+                onModeChange={setPreviewMode}
+              />
+            ) : null}
+          </div>
 
           <div className="text-ink-3 flex min-h-[16px] flex-wrap gap-x-[14px] gap-y-1 px-10 pb-3.5 font-mono text-[11px]">
             {phase.kind === "refining" ? (
@@ -421,13 +544,15 @@ export function ScratchPad(): ReactElement {
           </div>
 
           <footer className="@container flex items-center justify-between gap-4 px-[22px] py-[13px]">
-            <FooterHints hints={refining ? REFINING_HINTS : DEFAULT_HINTS} />
+            <FooterHints
+              hints={refining ? REFINING_HINTS : splitMode ? SPLIT_HINTS : DEFAULT_HINTS}
+            />
             <span className="text-ink-3 min-w-0 truncate font-mono text-[11px] @max-[30rem]:hidden">{`${model} · local mode`}</span>
           </footer>
         </div>
       </div>
 
-      <ResizeHandles />
+      <ResizeHandles {...(splitMode ? { minWidth: SPLIT_MIN_WIDTH } : {})} />
     </div>
   );
 }
