@@ -149,6 +149,64 @@ describe("refine", () => {
       }),
     ).rejects.toThrow();
   });
+
+  it("strips a leading <think> reasoning block from the content", async () => {
+    const { fetchImpl } = mockFetch(() =>
+      chatResponse("<think>Decide the tone and fix grammar.</think>Add a dark mode toggle."),
+    );
+
+    const result = await refine({
+      baseUrl: BASE_URL,
+      apiKey: API_KEY,
+      model: MODEL,
+      instruction: DEFAULT_INSTRUCTION,
+      input: INPUT,
+      fetchImpl,
+    });
+
+    expect(result).toBe("Add a dark mode toggle.");
+  });
+
+  it("throws a clear error when the model returns only reasoning", async () => {
+    const { fetchImpl } = mockFetch(
+      () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "", reasoning: "thinking through it" } }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+
+    const error = await refine({
+      baseUrl: BASE_URL,
+      apiKey: API_KEY,
+      model: MODEL,
+      instruction: DEFAULT_INSTRUCTION,
+      input: INPUT,
+      fetchImpl,
+    }).catch((reason: unknown) => reason);
+
+    if (!(error instanceof Error)) {
+      throw new Error("expected refine to throw an Error");
+    }
+    expect(error.message).toContain("only reasoning");
+  });
+
+  it("throws a clear error when the model returns an unclosed leading reasoning block", async () => {
+    const { fetchImpl } = mockFetch(() => chatResponse("<think>thinking through it"));
+
+    await expect(
+      refine({
+        baseUrl: BASE_URL,
+        apiKey: API_KEY,
+        model: MODEL,
+        instruction: DEFAULT_INSTRUCTION,
+        input: INPUT,
+        fetchImpl,
+      }),
+    ).rejects.toThrow("only reasoning");
+  });
 });
 
 describe("testConnection", () => {

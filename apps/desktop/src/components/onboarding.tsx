@@ -34,7 +34,7 @@ const PROVIDERS: readonly ProviderOption[] = [
     value: "cerebras",
     label: "Cerebras",
     baseUrl: "https://api.cerebras.ai/v1",
-    model: "llama-3.3-70b",
+    model: "gemma-4-31b",
   },
   { value: "kimi", label: "Kimi", baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-8k" },
 ];
