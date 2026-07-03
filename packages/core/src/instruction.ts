@@ -86,3 +86,25 @@ export const STRUCTURE_INSTRUCTION: Instruction = {
   targetLanguage: "match-input",
   isDefault: false,
 };
+
+const ATX_HEADING_LINE = /^(\s*)#{1,6}\s+(\S.*)$/;
+
+/**
+ * Rewrites line-leading ATX headings as bold lines. Hardens Structure-mode
+ * output for a renderer that has no heading kind; leaves every other line
+ * untouched. Clean-mode output must never pass through this.
+ */
+export function normalizeStructureOutput(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => {
+      const match = ATX_HEADING_LINE.exec(line);
+      if (match === null) {
+        return line;
+      }
+      const indent = match[1] ?? "";
+      const title = match[2] ?? "";
+      return `${indent}**${title.trimEnd()}**`;
+    })
+    .join("\n");
+}
