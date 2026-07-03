@@ -2,7 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { DEFAULT_INSTRUCTION, type Instruction, isBlank } from "@velata/core";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@velata/ui";
+import { Button, Select, SelectContent, SelectItem, SelectTrigger } from "@velata/ui";
+import { X } from "lucide-react";
 import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
 
 import { DiffOverlay } from "@/components/diff-overlay";
@@ -350,7 +351,7 @@ export function ScratchPad(): ReactElement {
         <div className="flex min-w-0 flex-1 flex-col">
           <div
             data-tauri-drag-region="deep"
-            className="flex h-[52px] flex-none items-center justify-end px-5"
+            className="flex h-[52px] flex-none items-center justify-end gap-1 px-5"
           >
             <Select value={instruction.targetLanguage} onValueChange={setTargetLanguage}>
               <SelectTrigger
@@ -367,6 +368,15 @@ export function ScratchPad(): ReactElement {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleDismiss}
+              aria-label="Close"
+              className="text-ink-3 hover:bg-raise hover:text-ink size-7 rounded-[7px] border-0 bg-transparent p-0 transition-colors"
+            >
+              <X aria-hidden className="size-3.5" />
+            </Button>
           </div>
 
           <Editor

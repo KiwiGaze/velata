@@ -127,7 +127,7 @@ export function DraftsRail({
               </button>
             )}
           </div>
-          <ScrollArea className="min-h-0 min-w-0 flex-1 overflow-x-hidden [&_[data-slot=scroll-area-viewport]]:overflow-x-hidden">
+          <ScrollArea className="min-h-0 min-w-0 flex-1 overflow-x-hidden [&_[data-slot=scroll-area-viewport]]:overflow-x-hidden [&_[data-slot=scroll-area-viewport]>div]:block!">
             <div className="flex min-w-0 flex-col gap-px overflow-x-hidden">
               {noMatches ? (
                 <div className="text-ink-3 px-2.5 py-4 text-center text-[12px]">
