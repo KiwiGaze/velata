@@ -61,8 +61,7 @@ export function ScratchPad(): ReactElement {
     useDrafts();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [railOpen, setRailOpen] = useState(false);
-  const [formattingOpen, setFormattingOpen] = useState(false);
-  const [transformsOpen, setTransformsOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<"formatting" | "transforms" | null>(null);
   const [transformBatch, setTransformBatch] = useState<readonly Instruction[]>(() =>
     pickTransforms(TRANSFORM_PRESETS, TRANSFORM_COUNT, []),
   );
@@ -84,6 +83,8 @@ export function ScratchPad(): ReactElement {
   const instruction: Instruction =
     settings.instructions.find((entry) => entry.isDefault) ?? DEFAULT_INSTRUCTION;
   const refining = phase.kind === "refining";
+  const formattingOpen = activePanel === "formatting";
+  const transformsOpen = activePanel === "transforms";
   const model = settings.model.length > 0 ? settings.model : "No model";
 
   const setTargetLanguage = useCallback(
@@ -355,12 +356,10 @@ export function ScratchPad(): ReactElement {
             setRailOpen((open) => !open);
           }}
           onToggleFormatting={() => {
-            setFormattingOpen((open) => !open);
-            setTransformsOpen(false);
+            setActivePanel((panel) => (panel === "formatting" ? null : "formatting"));
           }}
           onToggleTransforms={() => {
-            setTransformsOpen((open) => !open);
-            setFormattingOpen(false);
+            setActivePanel((panel) => (panel === "transforms" ? null : "transforms"));
           }}
         />
 

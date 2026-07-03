@@ -1,5 +1,12 @@
 import { type Instruction } from "@velata/core";
-import { Separator, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@velata/ui";
+import {
+  Button,
+  Separator,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@velata/ui";
 import { RefreshCw } from "lucide-react";
 import { type ReactElement } from "react";
 
@@ -27,9 +34,11 @@ export function TransformBar({
           className="pointer-events-auto border-line bg-paper flex items-center gap-1 rounded-[11px] border px-1.5 py-1 shadow-[0_10px_28px_-14px_rgb(0_0_0/0.3),0_2px_8px_-4px_rgb(0_0_0/0.12)]"
         >
           {presets.map((preset) => (
-            <button
+            <Button
               key={preset.id}
               type="button"
+              variant="ghost"
+              size="sm"
               disabled={disabled}
               onMouseDown={(event) => {
                 event.preventDefault();
@@ -37,10 +46,9 @@ export function TransformBar({
               onClick={() => {
                 onRun(preset);
               }}
-              className="text-ink-2 hover:bg-raise-2 hover:text-ink bg-raise rounded-[8px] px-2.5 py-[5px] text-[12px] transition-colors disabled:pointer-events-none disabled:opacity-40"
             >
               {preset.name}
-            </button>
+            </Button>
           ))}
           <Separator orientation="vertical" className="mx-0.5 h-4" />
           <Tooltip>

@@ -4,10 +4,17 @@ import { type Instruction } from "@velata/core";
 export const TRANSFORM_COUNT = 3;
 
 function shuffle<T>(items: readonly T[]): T[] {
-  return [...items]
-    .map((value) => ({ value, order: Math.random() }))
-    .sort((left, right) => left.order - right.order)
-    .map(({ value }) => value);
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const a = result[i];
+    const b = result[j];
+    if (a !== undefined && b !== undefined) {
+      result[i] = b;
+      result[j] = a;
+    }
+  }
+  return result;
 }
 
 /**
