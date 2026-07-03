@@ -43,16 +43,19 @@
 
 ## Logo / 标识
 
-双笔画 V 字标，讲产品故事本身：左笔画 ink @ 45%（毛坯的口述输入），右笔画 ink 实色（改写后的成稿）——「说得乱，发得净」。只有两级墨色，无色相、无渐变；圆头笔画呼应整体圆角语言。
+「双面板」标：两块实心墨色圆角方板，前板向右下错位，重叠处由一圈等宽的**真镂空**间隙隔开——悬浮便签盖在工作面之上。单一墨色、无透明度层级、无渐变；背板画成 L 形路径，间隙是真负空间，任何底色都能透出。
+
+两套母版（512 画布）：**标准版**（面板 224、圆角 58、错位 72、间隙 24）用于 ≥20px（应用图标、界面、字标）；**紧凑版**（面板 248、圆角 64、错位 100、间隙 48）用于 <20px 与菜单栏托盘，小尺寸不糊。
 
 | 资产                        | 用途                                                                                                                              |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `logo/velata-mark.svg`      | 标准字标（浅色背景）                                                                                                              |
-| `logo/velata-mark-dark.svg` | 深色背景变体（paper 色笔画）                                                                                                      |
-| `logo/velata-icon.svg`      | macOS 应用图标源：paper 圆角砖 + line-2 发丝描边 + 柔和投影 + 居中字标。改动后跑 `pnpm tauri icon design/logo/velata-icon.svg` 重新生成 `apps/desktop/src-tauri/icons/` |
+| `logo/velata-mark-dark.svg` | 深色背景变体（paper 色填充）                                                                                                      |
+| `logo/velata-icon.svg`      | macOS 应用图标源：paper 圆角砖 + line-2 发丝描边 + 柔和投影 + 居中标准版字标。改动后跑 `pnpm tauri icon design/logo/velata-icon.svg` 重新生成 `apps/desktop/src-tauri/icons/` |
+| `logo/velata-tray.svg`      | 菜单栏托盘源（紧凑版、纯黑填充）。改动后跑 `pnpm tauri icon design/logo/velata-tray.svg -o <临时目录>`，取其 `32x32.png` 覆盖 `apps/desktop/src-tauri/icons/tray.png` |
 
 **规则**：
 
 - 菜单栏托盘用 `apps/desktop/src-tauri/icons/tray.png`（黑 + alpha 模板图像，系统随菜单栏明暗自动着色）。
-- 界面内一律用 `apps/desktop/src/components/logo.tsx` 的 `VelataMark`（currentColor，墨色随上下文）。
-- 字标四周留白 ≥ 一个笔画宽；不加色、不加特效、不变形。
+- 界面内一律用 `apps/desktop/src/components/logo.tsx` 的 `VelataMark`（currentColor，墨色随上下文；`size < 20` 自动切换紧凑版几何）。
+- 字标四周留白 ≥ 面板间隙宽度的两倍；不加色、不加特效、不变形。

@@ -23,8 +23,8 @@ open apps/desktop/src-tauri/target/release/bundle/macos/Velata.app
 ```
 
 The app launches hidden with **no Dock icon** (accessory app). It lives in the menu-bar tray,
-shown as the Velata V **template icon** — check it recolors correctly on both light and dark
-menu bars.
+shown as the Velata two-panes **template icon** — check it recolors correctly on both light and
+dark menu bars, and that the gap between the two panes stays visible at menu-bar size.
 
 ## 1. First run — onboarding
 
@@ -95,6 +95,8 @@ Clean-sheet look: near-white paper, zero color except near-black ink and the one
 Geist fonts, hairline dividers, the floating sheet has a soft neutral drop shadow over the frosted
 backdrop, focus rings are visible on keyboard navigation, and Refining shows a monochrome progress
 line (no blinking, no color). Reduced-motion is respected.
+The two-panes mark renders crisply in onboarding (40px, standard geometry) and in the settings
+sidebar (13px, compact geometry) — the gap must read at both sizes.
 
 ## 9. Resize the ScratchPad (drag any edge / corner)
 
