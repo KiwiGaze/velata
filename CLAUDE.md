@@ -88,7 +88,7 @@ A single `index.html` serves both windows. `src/main.tsx` branches on `getCurren
 
 ## UI rules
 
-- Strictly follow `design/tokens.md`: light cool palette, **zero color**, Geist fonts, generous whitespace, near-black ink as the only accent. `design/*.reference.html` are visual references only — rebuild in React + shadcn, never copy their HTML.
+- Strictly follow `design/tokens.md`: light cool palette, **zero color**, native macOS fonts (SF Pro through `-apple-system` / `system-ui`, SF Mono for mono), generous whitespace, near-black ink as the only accent. `design/*.reference.html` are visual references only — rebuild in React + shadcn, never copy their HTML.
 - Use shadcn components from `@velata/ui`, not raw HTML elements (component mapping: design-spec §11.2).
 - Every screen implements all of its states (scratchpad: empty / editing / refining / refined / multi-draft; each settings pane; onboarding).
 - Fully keyboard-operable, visible `:focus-visible`, respect `prefers-reduced-motion`. Refining state uses the thin top `Progress` line — no color, no blinking.

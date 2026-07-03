@@ -19,8 +19,8 @@
 
 ## 字体
 
-- Sans（UI + 正文）：**Geist**
-- Mono（键帽 / 元数据 / gutter）：**Geist Mono**
+- Sans（UI + 正文）：**macOS native**（SF Pro via `-apple-system` / `system-ui`）
+- Mono（键帽 / 元数据 / gutter）：**SF Mono**
 - CJK 回退：PingFang SC, Hiragino Sans GB
 - 层次靠字重（400/500/600），不靠色相。
 

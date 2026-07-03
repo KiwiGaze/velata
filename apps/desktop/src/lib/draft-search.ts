@@ -1,3 +1,5 @@
+import { parseFormattedMarkdown } from "./markdown-format";
+
 /** A half-open range of matched characters within a string; `end` is exclusive. */
 export interface HighlightRange {
   start: number;
@@ -25,8 +27,7 @@ export interface DraftSearchResult<T> {
 const SNIPPET_CONTEXT_BEFORE = 24;
 const SNIPPET_LENGTH = 96;
 
-/** The first line with non-whitespace content, trimmed, or `null` when there is none. */
-export function firstNonEmptyLine(text: string): string | null {
+export function firstNonEmptySourceLine(text: string): string | null {
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
     if (trimmed.length > 0) {
@@ -34,6 +35,16 @@ export function firstNonEmptyLine(text: string): string | null {
     }
   }
   return null;
+}
+
+/** The first rendered line with non-whitespace content, trimmed, or `null` when there is none. */
+export function firstNonEmptyLine(text: string): string | null {
+  const sourceLine = firstNonEmptySourceLine(text);
+  if (sourceLine === null) {
+    return null;
+  }
+  const visibleLine = parseFormattedMarkdown(sourceLine).visibleText.trim();
+  return visibleLine.length > 0 ? visibleLine : null;
 }
 
 /** All case-insensitive, non-overlapping ranges where `query` occurs in `text`. */
@@ -62,7 +73,8 @@ export function matchDraft(text: string, query: string): DraftMatch | null {
   if (trimmedQuery.length === 0) {
     return null;
   }
-  const firstIndex = text.toLowerCase().indexOf(trimmedQuery.toLowerCase());
+  const visibleText = parseFormattedMarkdown(text).visibleText;
+  const firstIndex = visibleText.toLowerCase().indexOf(trimmedQuery.toLowerCase());
   if (firstIndex === -1) {
     return null;
   }
@@ -71,12 +83,12 @@ export function matchDraft(text: string, query: string): DraftMatch | null {
   const titleRanges = findMatchRanges(title, trimmedQuery);
 
   const windowStart = Math.max(0, firstIndex - SNIPPET_CONTEXT_BEFORE);
-  const windowEnd = Math.min(text.length, windowStart + SNIPPET_LENGTH);
-  let snippetText = text.slice(windowStart, windowEnd).replace(/\s+/g, " ");
+  const windowEnd = Math.min(visibleText.length, windowStart + SNIPPET_LENGTH);
+  let snippetText = visibleText.slice(windowStart, windowEnd).replace(/\s+/g, " ");
   if (windowStart > 0) {
     snippetText = `…${snippetText}`;
   }
-  if (windowEnd < text.length) {
+  if (windowEnd < visibleText.length) {
     snippetText = `${snippetText}…`;
   }
 

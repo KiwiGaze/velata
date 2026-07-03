@@ -7,7 +7,7 @@ import { type ReactElement, useCallback, useEffect, useRef, useState } from "rea
 
 import { DiffOverlay } from "@/components/diff-overlay";
 import { DraftsRail } from "@/components/drafts-rail";
-import { Editor } from "@/components/editor";
+import { Editor, type EditorHandle } from "@/components/editor";
 import { FooterHints, type Hint } from "@/components/footer-hints";
 import { FormattingToolbar } from "@/components/formatting-toolbar";
 import { InstructionPalette } from "@/components/instruction-palette";
@@ -60,8 +60,13 @@ export function ScratchPad(): ReactElement {
   const [railOpen, setRailOpen] = useState(false);
   const [formattingOpen, setFormattingOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [formatUndo, setFormatUndo] = useState<{
+    text: string;
+    selectionStart: number;
+    selectionEnd: number;
+  } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const editorRef = useRef<EditorHandle | null>(null);
 
   const focusEditor = useCallback((): void => {
     requestAnimationFrame(() => {
@@ -87,6 +92,7 @@ export function ScratchPad(): ReactElement {
   const resetTransient = useCallback((): void => {
     abortRef.current?.abort();
     abortRef.current = null;
+    setFormatUndo(null);
     setPhase({ kind: "idle" });
   }, []);
 
@@ -126,6 +132,7 @@ export function ScratchPad(): ReactElement {
   }
 
   function handleTextChange(next: string): void {
+    setFormatUndo(null);
     updateActiveText(next);
     if (phase.kind === "refined" || phase.kind === "error") {
       setPhase({ kind: "idle" });
@@ -133,27 +140,24 @@ export function ScratchPad(): ReactElement {
   }
 
   function handleApplyFormat(action: FormatAction): void {
-    const textarea = editorRef.current;
-    if (textarea === null || phase.kind === "refining") {
+    const editor = editorRef.current;
+    if (editor === null || phase.kind === "refining") {
       return;
     }
-    const plan = planFormat(activeText, textarea.selectionStart, textarea.selectionEnd, action);
-    textarea.focus();
-    textarea.setSelectionRange(plan.replaceStart, plan.replaceEnd);
-    /* eslint-disable @typescript-eslint/no-deprecated */
-    const applied =
-      plan.insert.length > 0
-        ? document.execCommand("insertText", false, plan.insert)
-        : plan.replaceEnd > plan.replaceStart
-          ? document.execCommand("delete")
-          : true;
-    /* eslint-enable @typescript-eslint/no-deprecated */
-    if (!applied) {
-      handleTextChange(
-        `${activeText.slice(0, plan.replaceStart)}${plan.insert}${activeText.slice(plan.replaceEnd)}`,
-      );
+    const selection = editor.getSelectionRange();
+    const plan = planFormat(activeText, selection.start, selection.end, action);
+    const next = `${activeText.slice(0, plan.replaceStart)}${plan.insert}${activeText.slice(plan.replaceEnd)}`;
+    setFormatUndo({
+      text: activeText,
+      selectionStart: selection.start,
+      selectionEnd: selection.end,
+    });
+    updateActiveText(next);
+    if (phase.kind === "refined" || phase.kind === "error") {
+      setPhase({ kind: "idle" });
     }
     requestAnimationFrame(() => {
+      editorRef.current?.focus();
       editorRef.current?.setSelectionRange(plan.selectionStart, plan.selectionEnd);
     });
   }
@@ -163,14 +167,14 @@ export function ScratchPad(): ReactElement {
       return;
     }
 
-    const active = document.activeElement;
     let target = activeText;
     let selectionStart = 0;
     let selectionEnd = activeText.length;
     let hasSelection = false;
-    if (active instanceof HTMLTextAreaElement && active.selectionStart !== active.selectionEnd) {
-      selectionStart = active.selectionStart;
-      selectionEnd = active.selectionEnd;
+    const selection = editorRef.current?.getSelectionRange();
+    if (selection !== undefined && selection.start !== selection.end) {
+      selectionStart = selection.start;
+      selectionEnd = selection.end;
       target = activeText.slice(selectionStart, selectionEnd);
       hasSelection = true;
     }
@@ -215,11 +219,21 @@ export function ScratchPad(): ReactElement {
   }
 
   function handleUndo(): void {
-    if (phase.kind !== "refined") {
+    if (phase.kind === "refined") {
+      updateActiveText(phase.previous);
+      setPhase({ kind: "idle" });
       return;
     }
-    updateActiveText(phase.previous);
-    setPhase({ kind: "idle" });
+    if (formatUndo === null) {
+      return;
+    }
+    updateActiveText(formatUndo.text);
+    const { selectionStart, selectionEnd } = formatUndo;
+    setFormatUndo(null);
+    requestAnimationFrame(() => {
+      editorRef.current?.focus();
+      editorRef.current?.setSelectionRange(selectionStart, selectionEnd);
+    });
   }
 
   function handleDismissDiff(): void {
@@ -296,16 +310,14 @@ export function ScratchPad(): ReactElement {
     onOpenSettings: () => {
       void invoke("open_settings");
     },
-    canUndo: phase.kind === "refined",
+    canUndo: phase.kind === "refined" || formatUndo !== null,
     draftCount: drafts.length,
     paletteOpen,
   });
 
-  const draftCount = drafts.length;
-
   return (
     <div className="relative h-full w-full">
-      <div className="bg-paper relative flex h-full w-full flex-col overflow-hidden rounded-[18px] border border-[rgba(20,22,30,0.06)]">
+      <div className="bg-paper relative flex h-full w-full overflow-hidden rounded-[18px] border border-[rgba(20,22,30,0.06)]">
         <ProgressLine active={refining} />
 
         <InstructionPalette
@@ -315,100 +327,89 @@ export function ScratchPad(): ReactElement {
           onRun={handleRefine}
         />
 
-        <div data-tauri-drag-region="deep" className="flex items-center justify-between px-5 pt-4">
-          <button
-            type="button"
-            onClick={() => {
-              setRailOpen((open) => !open);
-            }}
-            aria-expanded={railOpen}
-            aria-label={`Drafts (${draftCount.toString()} ${draftCount === 1 ? "draft" : "drafts"})`}
-            className="text-ink-2 hover:bg-raise hover:text-ink inline-flex items-center rounded-[7px] px-2 py-[5px] transition-colors"
-          >
-            <span aria-hidden className="flex flex-col gap-[2px]">
-              <span className="h-0.5 w-[13px] rounded-[2px] bg-current" />
-              <span className="h-0.5 w-[13px] rounded-[2px] bg-current" />
-              <span className="h-0.5 w-[13px] rounded-[2px] bg-current" />
-            </span>
-          </button>
-          <Select value={instruction.targetLanguage} onValueChange={setTargetLanguage}>
-            <SelectTrigger
-              aria-label="Target language"
-              className="text-ink-3 hover:bg-raise hover:text-ink h-auto w-auto gap-1.5 rounded-[7px] border-0 bg-transparent px-2 py-[5px] font-mono text-[11px]"
-            >
-              {`→ ${targetLanguageLabel(instruction.targetLanguage)}`}
-            </SelectTrigger>
-            <SelectContent align="end">
-              {TARGET_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <DraftsRail
+          open={railOpen}
+          drafts={drafts}
+          activeId={activeId}
+          formattingOpen={formattingOpen}
+          onSelect={handleSelectDraft}
+          onDelete={handleDeleteDraft}
+          onCreate={handleCreateDraft}
+          onToggleOpen={() => {
+            setRailOpen((open) => !open);
+          }}
+          onToggleFormatting={() => {
+            setFormattingOpen((open) => !open);
+          }}
+        />
 
-        <div className="flex min-h-0 flex-1">
-          <DraftsRail
-            open={railOpen}
-            drafts={drafts}
-            activeId={activeId}
-            formattingOpen={formattingOpen}
-            onSelect={handleSelectDraft}
-            onDelete={handleDeleteDraft}
-            onCreate={handleCreateDraft}
-            onToggleFormatting={() => {
-              setFormattingOpen((open) => !open);
-            }}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div
+            data-tauri-drag-region="deep"
+            className="flex h-[52px] flex-none items-center justify-end px-5"
+          >
+            <Select value={instruction.targetLanguage} onValueChange={setTargetLanguage}>
+              <SelectTrigger
+                aria-label="Target language"
+                className="text-ink-3 hover:bg-raise hover:text-ink h-auto w-auto gap-1.5 rounded-[7px] border-0 bg-transparent px-2 py-[5px] font-mono text-[11px]"
+              >
+                {`→ ${targetLanguageLabel(instruction.targetLanguage)}`}
+              </SelectTrigger>
+              <SelectContent align="end">
+                {TARGET_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Editor
+            ref={editorRef}
+            value={activeText}
+            onChange={handleTextChange}
+            dimmed={refining}
+            readOnly={refining}
+            overlay={
+              phase.kind === "refined" ? (
+                <DiffOverlay
+                  before={phase.previous}
+                  after={activeText}
+                  onDismiss={handleDismissDiff}
+                />
+              ) : undefined
+            }
+            toolbar={
+              formattingOpen && phase.kind !== "refining" && phase.kind !== "refined" ? (
+                <FormattingToolbar onApply={handleApplyFormat} />
+              ) : undefined
+            }
           />
 
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Editor
-              ref={editorRef}
-              value={activeText}
-              onChange={handleTextChange}
-              dimmed={refining}
-              readOnly={refining}
-              overlay={
-                phase.kind === "refined" ? (
-                  <DiffOverlay
-                    before={phase.previous}
-                    after={activeText}
-                    onDismiss={handleDismissDiff}
-                  />
-                ) : undefined
-              }
-              toolbar={
-                formattingOpen && phase.kind !== "refining" && phase.kind !== "refined" ? (
-                  <FormattingToolbar onApply={handleApplyFormat} />
-                ) : undefined
-              }
-            />
-
-            <div className="text-ink-3 flex min-h-[16px] flex-wrap gap-x-[14px] gap-y-1 px-10 pb-3.5 font-mono text-[11px]">
-              {phase.kind === "refining" ? (
-                <span className="text-ink-2">Refining…</span>
-              ) : phase.kind === "refined" ? (
-                <>
-                  <span className="text-ink-2">Refined</span>
-                  <span>click or type to edit</span>
-                  <span>⌘Z to undo</span>
-                </>
-              ) : phase.kind === "error" ? (
-                <span className="text-ink-2">{phase.message}</span>
-              ) : isBlank(activeText) ? null : (
-                <>
-                  <span>{`${countWords(activeText).toString()} words`}</span>
-                  <span>draft saved</span>
-                </>
-              )}
-            </div>
-
-            <footer className="border-line @container flex items-center justify-between gap-4 border-t px-[22px] py-[13px]">
-              <FooterHints hints={refining ? REFINING_HINTS : DEFAULT_HINTS} />
-              <span className="text-ink-3 min-w-0 truncate font-mono text-[11px] @max-[30rem]:hidden">{`${model} · local mode`}</span>
-            </footer>
+          <div className="text-ink-3 flex min-h-[16px] flex-wrap gap-x-[14px] gap-y-1 px-10 pb-3.5 font-mono text-[11px]">
+            {phase.kind === "refining" ? (
+              <span className="text-ink-2">Refining…</span>
+            ) : phase.kind === "refined" ? (
+              <>
+                <span className="text-ink-2">Refined</span>
+                <span>click or type to edit</span>
+                <span>⌘Z to undo</span>
+              </>
+            ) : phase.kind === "error" ? (
+              <span className="text-ink-2">{phase.message}</span>
+            ) : isBlank(activeText) ? null : (
+              <>
+                <span>{`${countWords(activeText).toString()} words`}</span>
+                <span>draft saved</span>
+              </>
+            )}
           </div>
+
+          <footer className="@container flex items-center justify-between gap-4 px-[22px] py-[13px]">
+            <FooterHints hints={refining ? REFINING_HINTS : DEFAULT_HINTS} />
+            <span className="text-ink-3 min-w-0 truncate font-mono text-[11px] @max-[30rem]:hidden">{`${model} · local mode`}</span>
+          </footer>
         </div>
       </div>
 
