@@ -192,6 +192,21 @@ describe("refine", () => {
     }
     expect(error.message).toContain("only reasoning");
   });
+
+  it("throws a clear error when the model returns an unclosed leading reasoning block", async () => {
+    const { fetchImpl } = mockFetch(() => chatResponse("<think>thinking through it"));
+
+    await expect(
+      refine({
+        baseUrl: BASE_URL,
+        apiKey: API_KEY,
+        model: MODEL,
+        instruction: DEFAULT_INSTRUCTION,
+        input: INPUT,
+        fetchImpl,
+      }),
+    ).rejects.toThrow("only reasoning");
+  });
 });
 
 describe("testConnection", () => {

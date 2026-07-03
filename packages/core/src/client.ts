@@ -105,6 +105,7 @@ const REASONING_ONLY_ERROR =
   "The model returned only reasoning, no refined text. Try a non-reasoning model.";
 
 const LEADING_THINK_BLOCK = /^\s*<think>[\s\S]*?<\/think>\s*/i;
+const LEADING_THINK_TAG = /^\s*<think>/i;
 
 /** Removes a leading `<think>…</think>` reasoning block, then trims. */
 function stripReasoning(content: string): string {
@@ -121,9 +122,12 @@ function parseRefinedText(payload: unknown): string {
     throw new Error("Unexpected response: missing choices[0].message.content");
   }
   const cleaned = stripReasoning(rawContent);
+  if (LEADING_THINK_TAG.test(cleaned)) {
+    throw new Error(REASONING_ONLY_ERROR);
+  }
   if (
     cleaned.length === 0 &&
-    (/<think>/i.test(rawContent) || (message !== undefined && hasReasoning(message)))
+    (LEADING_THINK_TAG.test(rawContent) || (message !== undefined && hasReasoning(message)))
   ) {
     throw new Error(REASONING_ONLY_ERROR);
   }
