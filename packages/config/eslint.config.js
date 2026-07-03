@@ -17,6 +17,8 @@ export function velataEslint({ tsconfigRootDir }) {
       ignores: [
         "**/dist/**",
         "**/node_modules/**",
+        "**/.claude/worktrees/**",
+        "**/.worktrees/**",
         "**/.turbo/**",
         "**/coverage/**",
         "apps/desktop/src-tauri/target/**",

@@ -16,10 +16,28 @@ interface LineAction {
   prefix: (index: number) => string;
 }
 
+interface SelectionRange {
+  start: number;
+  end: number;
+}
+
 const BULLET: LineAction = { detect: /^- (?!\[)/, prefix: () => "- " };
 const CHECK: LineAction = { detect: /^- \[[ xX]\] /, prefix: () => "- [ ] " };
 const QUOTE: LineAction = { detect: /^> /, prefix: () => "> " };
 const NUMBERED: LineAction = { detect: /^\d+\. /, prefix: (index) => `${index.toString()}. ` };
+
+function normalizeSelection(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+): SelectionRange {
+  const safeStart = Math.max(0, Math.min(selectionStart, value.length));
+  const safeEnd = Math.max(0, Math.min(selectionEnd, value.length));
+  return {
+    start: Math.min(safeStart, safeEnd),
+    end: Math.max(safeStart, safeEnd),
+  };
+}
 
 function planInline(
   value: string,
@@ -146,22 +164,23 @@ export function planFormat(
   selectionEnd: number,
   action: FormatAction,
 ): FormatPlan {
+  const selection = normalizeSelection(value, selectionStart, selectionEnd);
   switch (action) {
     case "bold":
-      return planInline(value, selectionStart, selectionEnd, "**", false);
+      return planInline(value, selection.start, selection.end, "**", false);
     case "italic":
-      return planInline(value, selectionStart, selectionEnd, "*", true);
+      return planInline(value, selection.start, selection.end, "*", true);
     case "code":
-      return planInline(value, selectionStart, selectionEnd, "`", false);
+      return planInline(value, selection.start, selection.end, "`", false);
     case "bullet-list":
-      return planLineBlock(value, selectionStart, selectionEnd, BULLET);
+      return planLineBlock(value, selection.start, selection.end, BULLET);
     case "numbered-list":
-      return planLineBlock(value, selectionStart, selectionEnd, NUMBERED);
+      return planLineBlock(value, selection.start, selection.end, NUMBERED);
     case "check-list":
-      return planLineBlock(value, selectionStart, selectionEnd, CHECK);
+      return planLineBlock(value, selection.start, selection.end, CHECK);
     case "quote":
-      return planLineBlock(value, selectionStart, selectionEnd, QUOTE);
+      return planLineBlock(value, selection.start, selection.end, QUOTE);
     case "link":
-      return planLink(value, selectionStart, selectionEnd);
+      return planLink(value, selection.start, selection.end);
   }
 }

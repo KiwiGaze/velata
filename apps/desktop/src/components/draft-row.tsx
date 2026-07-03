@@ -3,7 +3,13 @@ import { Trash2 } from "lucide-react";
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { type Draft } from "@/hooks/use-drafts";
-import { type DraftMatch, firstNonEmptyLine, type HighlightRange } from "@/lib/draft-search";
+import {
+  type DraftMatch,
+  firstNonEmptyLine,
+  firstNonEmptySourceLine,
+  type HighlightRange,
+} from "@/lib/draft-search";
+import { type MarkdownRun, parseFormattedMarkdown } from "@/lib/markdown-format";
 import { formatRelativeTime } from "@/lib/relative-time";
 
 interface DraftRowProps {
@@ -41,6 +47,47 @@ function renderHighlighted(text: string, ranges: HighlightRange[]): ReactNode {
   return nodes;
 }
 
+function runClassName(run: MarkdownRun): string {
+  return cn(
+    run.marks.includes("bold") && "font-semibold",
+    run.marks.includes("italic") && "italic",
+    run.marks.includes("code") && "bg-raise rounded-[4px] px-0.5 font-mono text-[0.92em]",
+    run.marks.includes("link") && "underline decoration-1 underline-offset-[2px]",
+  );
+}
+
+function renderFormattedRun(
+  run: MarkdownRun,
+  ranges: HighlightRange[],
+  visibleStart: number,
+): ReactNode {
+  const shiftedRanges = ranges
+    .map((range) => ({
+      start: Math.max(0, range.start - visibleStart),
+      end: Math.min(run.text.length, range.end - visibleStart),
+    }))
+    .filter((range) => range.start < range.end);
+  const content = renderHighlighted(run.text, shiftedRanges);
+  const className = runClassName(run);
+  if (className.length === 0) {
+    return content;
+  }
+  return <span className={className}>{content}</span>;
+}
+
+function renderFormattedTitle(source: string, ranges: HighlightRange[]): ReactNode {
+  const line = parseFormattedMarkdown(source).lines[0];
+  if (line === undefined || line.runs.length === 0) {
+    return "";
+  }
+  let visibleStart = 0;
+  return line.runs.map((run, index) => {
+    const node = <span key={index}>{renderFormattedRun(run, ranges, visibleStart)}</span>;
+    visibleStart += run.text.length;
+    return node;
+  });
+}
+
 /** A single draft entry in the rail: a two-line clamped title, a timestamp, an optional match snippet, and hover delete. */
 export function DraftRow({
   draft,
@@ -53,6 +100,7 @@ export function DraftRow({
   const titleRef = useRef<HTMLSpanElement>(null);
   const [truncated, setTruncated] = useState(false);
 
+  const sourceTitle = firstNonEmptySourceLine(draft.text);
   const title = firstNonEmptyLine(draft.text);
   const isEmpty = title === null;
   const label = title ?? "New draft";
@@ -83,9 +131,9 @@ export function DraftRow({
           ref={titleRef}
           className={cn("line-clamp-2 text-[13px] leading-[1.45]", isEmpty && "text-ink-3")}
         >
-          {match && match.titleRanges.length > 0
-            ? renderHighlighted(label, match.titleRanges)
-            : label}
+          {sourceTitle === null
+            ? label
+            : renderFormattedTitle(sourceTitle, match?.titleRanges ?? [])}
         </span>
         <span className="text-ink-3 font-mono text-[10.5px] font-normal">
           {formatRelativeTime(draft.updatedAt, now)}

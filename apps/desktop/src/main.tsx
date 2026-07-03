@@ -1,5 +1,3 @@
-import "@fontsource-variable/geist/index.css";
-import "@fontsource-variable/geist-mono/index.css";
 import "@velata/ui/globals.css";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";

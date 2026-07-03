@@ -105,7 +105,7 @@ palette only (does not hide the window).
 ## 8. Theme / polish (visual)
 
 Clean-sheet look: near-white paper, zero color except near-black ink and the one red delete-hover,
-Geist fonts, hairline dividers, the floating sheet has a soft neutral drop shadow over the frosted
+native macOS fonts, hairline dividers, the floating sheet has a soft neutral drop shadow over the frosted
 backdrop, focus rings are visible on keyboard navigation, and Refining shows a monochrome progress
 line (no blinking, no color). Reduced-motion is respected.
 The two-panes mark renders crisply in onboarding (40px, standard geometry) and in the settings
@@ -146,24 +146,27 @@ be verified on a real GUI session.
 1. Open the drafts rail, then click the pinned **Formatting** row → it takes the pressed styling and
    a monochrome floating toolbar appears bottom-center over the editor. Hover any button → a tooltip
    names it. Confirm zero color anywhere (ink on paper, hairline border, neutral drop shadow).
-2. **Bold:** select a word → click **Bold** → it wraps as `**word**` (selection stays on `word`).
-   Click **Bold** again → it unwraps back to `word`.
-3. **Italic over bold:** select the whole `**word**` (markers included) → click **Italic** → yields
-   `***word***`.
-4. **Code:** select text → click **Code** → wraps as `` `text` ``; clicking again unwraps.
-5. **Bulleted list:** put the caret on a line → click **Bulleted list** → the line gets a `- ` prefix;
-   click again → the prefix is removed.
-6. **Numbered list:** select several lines → click **Numbered list** → they become `1. `, `2. `,
-   `3. ` in order; click again → the numbers are stripped.
-7. **Checklist:** with the caret on a line → click **Checklist** → the line gets a `- [ ] ` prefix.
-8. **Quote:** with the caret on a line → click **Quote** → the line gets a `> ` prefix.
+2. **Bold:** select a word → click **Bold** → the word renders bold in the editor and in its draft
+   row title; the raw `**word**` markers are not visible. Click **Bold** again → it unwraps back to
+   plain text.
+3. **Italic over bold:** select a bold word → click **Italic** → it renders bold + italic without
+   showing `***` markers.
+4. **Code:** select text → click **Code** → it renders as inline code; clicking again unwraps.
+5. **Bulleted list:** put the caret on a line → click **Bulleted list** → the line renders with a
+   bullet marker, not a raw `- ` prefix; click again → the bullet is removed.
+6. **Numbered list:** select several lines → click **Numbered list** → they render as numbered
+   rows; click again → the numbers are stripped from the stored source.
+7. **Checklist:** with the caret on a line → click **Checklist** → the line renders with a checkbox.
+8. **Quote:** with the caret on a line → click **Quote** → the line renders as a quote, without a raw
+   `> ` prefix.
 9. **Empty-line no-op:** put the caret on a blank line → click any list or quote button → the text is
    unchanged (in particular, no preceding newline is deleted).
-10. **Link:** select `foo` → click **Link** → becomes `[foo](url)` with `url` selected. With nothing
-    selected → click **Link** → inserts `[text](url)` with `text` selected.
+10. **Link:** select `foo` → click **Link** → `foo` renders as a link-styled label while refine/copy
+    still use the Markdown source. With nothing selected → click **Link** → inserts a rendered
+    `text` placeholder with the text selected.
 11. **Empty selection Bold:** click into an empty spot (no selection) → click **Bold** → inserts
-    `****` with the caret centered between the markers, ready to type.
-12. **Undo:** apply any toolbar format → press **⌘Z** → the edit is undone (native textarea undo).
+    an empty bold span with the caret centered inside it, ready to type.
+12. **Undo:** apply any toolbar format → press **⌘Z** → the formatting edit is undone.
 13. **Focus is never stolen:** make a selection, then click a toolbar button → the text selection stays
     visible (the button press does not collapse the caret or blur the editor).
 14. **Refining:** press **⌘K** to refine → the toolbar hides while `Refining…` shows, then returns once

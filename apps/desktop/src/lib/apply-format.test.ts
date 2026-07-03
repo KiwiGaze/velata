@@ -20,6 +20,15 @@ describe("planFormat inline actions", () => {
     expect(apply("hello", plan)).toEqual({ value: "**hello**", selected: "hello" });
   });
 
+  it("normalizes reversed selections before wrapping bold text", () => {
+    const value = "Is Velata using a native font? How can I make it look\nmore graceful?";
+    const plan = planFormat(value, 30, 0, "bold");
+    expect(apply(value, plan)).toEqual({
+      value: "**Is Velata using a native font?** How can I make it look\nmore graceful?",
+      selected: "Is Velata using a native font?",
+    });
+  });
+
   it("unwraps bold when the selection includes the markers (case A)", () => {
     const plan = planFormat("**hello**", 0, 9, "bold");
     expect(plan).toEqual({

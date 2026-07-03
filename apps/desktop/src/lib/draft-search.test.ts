@@ -17,6 +17,10 @@ describe("firstNonEmptyLine", () => {
     expect(firstNonEmptyLine("\n\n  hello \nworld")).toBe("hello");
   });
 
+  it("returns the first rendered non-empty line without formatting markers", () => {
+    expect(firstNonEmptyLine("\n\n  **Hello** \nworld")).toBe("Hello");
+  });
+
   it("returns null when every line is blank", () => {
     expect(firstNonEmptyLine("   \n\t\n")).toBeNull();
     expect(firstNonEmptyLine("")).toBeNull();
@@ -60,6 +64,19 @@ describe("matchDraft", () => {
       { start: 0, end: 3 },
       { start: 8, end: 11 },
     ]);
+  });
+
+  it("matches formatted title text using rendered offsets", () => {
+    const match = matchDraft("**Hello**\nplain body", "hello");
+    expect(match?.titleRanges).toEqual([{ start: 0, end: 5 }]);
+  });
+
+  it("matches formatted body text using rendered snippets", () => {
+    const match = matchDraft("Title\nThis mentions **keyword** in bold", "keyword");
+    expect(match).not.toBeNull();
+    expect(match?.titleRanges).toEqual([]);
+    expect(match?.snippet?.text).toContain("keyword");
+    expect(match?.snippet?.ranges).toEqual([{ start: 20, end: 27 }]);
   });
 
   it("builds a snippet with ellipsis on both sides and correct highlight offsets", () => {

@@ -1,5 +1,5 @@
 import { cn, Input, ScrollArea, TooltipProvider } from "@velata/ui";
-import { ALargeSmall, Search, SquarePen, X } from "lucide-react";
+import { ALargeSmall, Menu, Search, SquarePen, X } from "lucide-react";
 import { type ReactElement, useEffect, useState } from "react";
 
 import { DraftRow } from "@/components/draft-row";
@@ -16,6 +16,7 @@ interface DraftsRailProps {
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onCreate: () => void;
+  onToggleOpen: () => void;
   onToggleFormatting: () => void;
 }
 
@@ -28,6 +29,7 @@ export function DraftsRail({
   onSelect,
   onDelete,
   onCreate,
+  onToggleOpen,
   onToggleFormatting,
 }: DraftsRailProps): ReactElement {
   const [now, setNow] = useState(() => Date.now());
@@ -56,15 +58,32 @@ export function DraftsRail({
 
   return (
     <aside
-      inert={!open}
       className={cn(
-        "border-line w-0 flex-none overflow-hidden border-r transition-[width] duration-200 ease-out",
+        "border-line flex w-[52px] flex-none flex-col overflow-hidden border-r transition-[width] duration-200 ease-out",
         open && "w-[228px]",
       )}
     >
       <TooltipProvider>
-        <div className="flex h-full w-[228px] flex-col px-2 pb-3 pt-2">
-          <div className="text-ink-3 px-2.5 pb-1.5 pt-2 font-mono text-[10.5px] uppercase tracking-[0.09em]">
+        <div data-tauri-drag-region="deep" className="flex h-[52px] flex-none items-center px-3">
+          <button
+            type="button"
+            onClick={onToggleOpen}
+            aria-expanded={open}
+            aria-label={`Drafts (${drafts.length.toString()} ${drafts.length === 1 ? "draft" : "drafts"})`}
+            className="text-ink-2 hover:bg-raise hover:text-ink flex size-8 items-center justify-center rounded-[7px] transition-colors"
+          >
+            <Menu aria-hidden className="size-4" />
+          </button>
+        </div>
+        <div
+          inert={!open}
+          aria-hidden={!open}
+          className={cn(
+            "flex min-h-0 w-[228px] flex-1 flex-col px-2 pb-3 transition-opacity duration-150",
+            open ? "opacity-100" : "opacity-0",
+          )}
+        >
+          <div className="text-ink-3 px-2.5 pb-1.5 font-mono text-[10.5px] uppercase tracking-[0.09em]">
             Drafts
           </div>
           <button
