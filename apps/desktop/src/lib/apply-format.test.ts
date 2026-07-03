@@ -165,6 +165,12 @@ describe("planFormat line actions", () => {
     });
     expect(apply("a\nb", plan).value).toBe("- a\nb");
   });
+
+  it("is a pure no-op when the caret sits on an empty line", () => {
+    const plan = planFormat("a\n\nb", 2, 2, "bullet-list");
+    expect(plan.insert).toBe("");
+    expect(plan.replaceStart).toBe(plan.replaceEnd);
+  });
 });
 
 describe("planFormat link action", () => {

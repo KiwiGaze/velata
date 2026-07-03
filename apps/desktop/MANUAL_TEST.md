@@ -137,3 +137,33 @@ be verified on a real GUI session.
    type into a terminal → ⌘⇧Space → type into Velata → Esc → the terminal is frontmost and receives
    typing again. If this regresses, drop `.resizable()` from the style mask in `lib.rs` — the JS
    `Math.max(MIN_WIDTH/MIN_HEIGHT, …)` clamp already enforces the minimum size on its own.
+
+## 10. Formatting toolbar
+
+1. Open the drafts rail, then click the pinned **Formatting** row → it takes the pressed styling and
+   a monochrome floating toolbar appears bottom-center over the editor. Hover any button → a tooltip
+   names it. Confirm zero color anywhere (ink on paper, hairline border, neutral drop shadow).
+2. **Bold:** select a word → click **Bold** → it wraps as `**word**` (selection stays on `word`).
+   Click **Bold** again → it unwraps back to `word`.
+3. **Italic over bold:** select the whole `**word**` (markers included) → click **Italic** → yields
+   `***word***`.
+4. **Code:** select text → click **Code** → wraps as `` `text` ``; clicking again unwraps.
+5. **Bulleted list:** put the caret on a line → click **Bulleted list** → the line gets a `- ` prefix;
+   click again → the prefix is removed.
+6. **Numbered list:** select several lines → click **Numbered list** → they become `1. `, `2. `,
+   `3. ` in order; click again → the numbers are stripped.
+7. **Checklist:** with the caret on a line → click **Checklist** → the line gets a `- [ ] ` prefix.
+8. **Quote:** with the caret on a line → click **Quote** → the line gets a `> ` prefix.
+9. **Empty-line no-op:** put the caret on a blank line → click any list or quote button → the text is
+   unchanged (in particular, no preceding newline is deleted).
+10. **Link:** select `foo` → click **Link** → becomes `[foo](url)` with `url` selected. With nothing
+    selected → click **Link** → inserts `[text](url)` with `text` selected.
+11. **Empty selection Bold:** click into an empty spot (no selection) → click **Bold** → inserts
+    `****` with the caret centered between the markers, ready to type.
+12. **Undo:** apply any toolbar format → press **⌘Z** → the edit is undone (native textarea undo).
+13. **Focus is never stolen:** make a selection, then click a toolbar button → the text selection stays
+    visible (the button press does not collapse the caret or blur the editor).
+14. **Refining:** press **⌘K** to refine → the toolbar hides while `Refining…` shows, then returns once
+    the result lands (applying a format in the `Refined` state edits the text and dismisses the diff,
+    exactly like typing).
+15. Click the **Formatting** row again → the toolbar hides.

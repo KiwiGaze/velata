@@ -8,9 +8,10 @@ interface EditorProps {
   readOnly: boolean;
   ref: Ref<HTMLTextAreaElement>;
   overlay?: ReactNode;
+  toolbar?: ReactNode;
 }
 
-/** The hero editing surface: a borderless textarea with an optional overlay. */
+/** The hero editing surface: a borderless textarea with an optional overlay and formatting toolbar. */
 export function Editor({
   value,
   onChange,
@@ -18,6 +19,7 @@ export function Editor({
   readOnly,
   ref,
   overlay,
+  toolbar,
 }: EditorProps): ReactElement {
   return (
     <div className="relative min-h-0 flex-1">
@@ -36,6 +38,7 @@ export function Editor({
         )}
       />
       {overlay}
+      {toolbar}
     </div>
   );
 }

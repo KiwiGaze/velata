@@ -9,6 +9,7 @@ import { DiffOverlay } from "@/components/diff-overlay";
 import { DraftsRail } from "@/components/drafts-rail";
 import { Editor } from "@/components/editor";
 import { FooterHints, type Hint } from "@/components/footer-hints";
+import { FormattingToolbar } from "@/components/formatting-toolbar";
 import { InstructionPalette } from "@/components/instruction-palette";
 import { ProgressLine } from "@/components/progress-line";
 import { ResizeHandles } from "@/components/resize-handles";
@@ -16,6 +17,7 @@ import { useDrafts } from "@/hooks/use-drafts";
 import { MissingApiKeyError, MissingModelError, useRefine } from "@/hooks/use-refine";
 import { useScratchpadKeys } from "@/hooks/use-scratchpad-keys";
 import { useSettings } from "@/hooks/use-settings";
+import { type FormatAction, planFormat } from "@/lib/apply-format";
 import { TARGET_OPTIONS, targetLanguageLabel, toTargetLanguage } from "@/lib/target-language";
 
 type Phase =
@@ -128,6 +130,32 @@ export function ScratchPad(): ReactElement {
     if (phase.kind === "refined" || phase.kind === "error") {
       setPhase({ kind: "idle" });
     }
+  }
+
+  function handleApplyFormat(action: FormatAction): void {
+    const textarea = editorRef.current;
+    if (textarea === null || phase.kind === "refining") {
+      return;
+    }
+    const plan = planFormat(activeText, textarea.selectionStart, textarea.selectionEnd, action);
+    textarea.focus();
+    textarea.setSelectionRange(plan.replaceStart, plan.replaceEnd);
+    /* eslint-disable @typescript-eslint/no-deprecated */
+    const applied =
+      plan.insert.length > 0
+        ? document.execCommand("insertText", false, plan.insert)
+        : plan.replaceEnd > plan.replaceStart
+          ? document.execCommand("delete")
+          : true;
+    /* eslint-enable @typescript-eslint/no-deprecated */
+    if (!applied) {
+      handleTextChange(
+        `${activeText.slice(0, plan.replaceStart)}${plan.insert}${activeText.slice(plan.replaceEnd)}`,
+      );
+    }
+    requestAnimationFrame(() => {
+      editorRef.current?.setSelectionRange(plan.selectionStart, plan.selectionEnd);
+    });
   }
 
   function handleRefine(chosen: Instruction = instruction): void {
@@ -350,6 +378,9 @@ export function ScratchPad(): ReactElement {
                   />
                 ) : undefined
               }
+              {...(formattingOpen && phase.kind !== "refining"
+                ? { toolbar: <FormattingToolbar onApply={handleApplyFormat} /> }
+                : {})}
             />
 
             <div className="text-ink-3 flex min-h-[16px] flex-wrap gap-x-[14px] gap-y-1 px-10 pb-3.5 font-mono text-[11px]">
