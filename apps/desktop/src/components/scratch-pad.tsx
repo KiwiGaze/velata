@@ -12,6 +12,7 @@ import {
   type Instruction,
   isBlank,
   STRUCTURE_INSTRUCTION,
+  TRANSFORM_PRESETS,
 } from "@velata/core";
 import { Button, cn, Select, SelectContent, SelectItem, SelectTrigger } from "@velata/ui";
 import { X } from "lucide-react";
@@ -26,6 +27,7 @@ import { InstructionPalette } from "@/components/instruction-palette";
 import { type PreviewMode, PreviewPane } from "@/components/preview-pane";
 import { ProgressLine } from "@/components/progress-line";
 import { ResizeHandles } from "@/components/resize-handles";
+import { TransformBar } from "@/components/transform-bar";
 import { useDrafts } from "@/hooks/use-drafts";
 import { useLivePreview } from "@/hooks/use-live-preview";
 import { MissingApiKeyError, MissingModelError, useRefine } from "@/hooks/use-refine";
@@ -34,6 +36,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { type FormatAction, planFormat } from "@/lib/apply-format";
 import { previewCopyText } from "@/lib/live-preview-scheduler";
 import { TARGET_OPTIONS, targetLanguageLabel, toTargetLanguage } from "@/lib/target-language";
+import { pickTransforms, TRANSFORM_COUNT } from "@/lib/transforms";
 
 type Phase =
   | { kind: "idle" }
@@ -81,7 +84,10 @@ export function ScratchPad(): ReactElement {
     useDrafts();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [railOpen, setRailOpen] = useState(false);
-  const [formattingOpen, setFormattingOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<"formatting" | "transforms" | null>(null);
+  const [transformBatch, setTransformBatch] = useState<readonly Instruction[]>(() =>
+    pickTransforms(TRANSFORM_PRESETS, TRANSFORM_COUNT, []),
+  );
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [formatUndo, setFormatUndo] = useState<{
     text: string;
@@ -103,6 +109,8 @@ export function ScratchPad(): ReactElement {
   const instruction: Instruction =
     settings.instructions.find((entry) => entry.isDefault) ?? DEFAULT_INSTRUCTION;
   const refining = phase.kind === "refining";
+  const formattingOpen = activePanel === "formatting";
+  const transformsOpen = activePanel === "transforms";
   const model = settings.model.length > 0 ? settings.model : "No model";
 
   const previewInstruction = useMemo<Instruction>(
@@ -205,6 +213,10 @@ export function ScratchPad(): ReactElement {
       editorRef.current?.focus();
       editorRef.current?.setSelectionRange(plan.selectionStart, plan.selectionEnd);
     });
+  }
+
+  function handleShuffleTransforms(): void {
+    setTransformBatch((prev) => pickTransforms(TRANSFORM_PRESETS, TRANSFORM_COUNT, prev));
   }
 
   function handleRefine(chosen: Instruction = instruction): void {
@@ -443,6 +455,7 @@ export function ScratchPad(): ReactElement {
           drafts={drafts}
           activeId={activeId}
           formattingOpen={formattingOpen}
+          transformsOpen={transformsOpen}
           onSelect={handleSelectDraft}
           onDelete={handleDeleteDraft}
           onCreate={handleCreateDraft}
@@ -450,7 +463,10 @@ export function ScratchPad(): ReactElement {
             setRailOpen((open) => !open);
           }}
           onToggleFormatting={() => {
-            setFormattingOpen((open) => !open);
+            setActivePanel((panel) => (panel === "formatting" ? null : "formatting"));
+          }}
+          onToggleTransforms={() => {
+            setActivePanel((panel) => (panel === "transforms" ? null : "transforms"));
           }}
         />
 
@@ -514,8 +530,15 @@ export function ScratchPad(): ReactElement {
                 ) : undefined
               }
               toolbar={
-                formattingOpen && phase.kind !== "refining" ? (
+                phase.kind === "refining" ? undefined : formattingOpen ? (
                   <FormattingToolbar onApply={handleApplyFormat} />
+                ) : transformsOpen && !splitMode ? (
+                  <TransformBar
+                    presets={transformBatch}
+                    disabled={isBlank(activeText)}
+                    onRun={handleRefine}
+                    onShuffle={handleShuffleTransforms}
+                  />
                 ) : undefined
               }
             />

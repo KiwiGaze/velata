@@ -1,5 +1,5 @@
 import { cn, Input, ScrollArea, TooltipProvider } from "@velata/ui";
-import { ALargeSmall, Menu, Search, SquarePen, X } from "lucide-react";
+import { ALargeSmall, ArrowRightLeft, Menu, Search, SquarePen, X } from "lucide-react";
 import { type ReactElement, useEffect, useState } from "react";
 
 import { DraftRow } from "@/components/draft-row";
@@ -13,11 +13,13 @@ interface DraftsRailProps {
   drafts: Draft[];
   activeId: string;
   formattingOpen: boolean;
+  transformsOpen: boolean;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onCreate: () => void;
   onToggleOpen: () => void;
   onToggleFormatting: () => void;
+  onToggleTransforms: () => void;
 }
 
 /** The collapsible left rail: a pinned new-draft row, draft search, filtered results, and a formatting toggle. */
@@ -26,11 +28,13 @@ export function DraftsRail({
   drafts,
   activeId,
   formattingOpen,
+  transformsOpen,
   onSelect,
   onDelete,
   onCreate,
   onToggleOpen,
   onToggleFormatting,
+  onToggleTransforms,
 }: DraftsRailProps): ReactElement {
   const [now, setNow] = useState(() => Date.now());
   const [query, setQuery] = useState("");
@@ -148,7 +152,21 @@ export function DraftsRail({
               )}
             </div>
           </ScrollArea>
-          <div className="border-line mt-2 border-t pt-2">
+          <div className="border-line mt-2 flex flex-col gap-px border-t pt-2">
+            <button
+              type="button"
+              onClick={onToggleTransforms}
+              aria-pressed={transformsOpen}
+              className={cn(
+                "flex w-full items-center gap-[9px] rounded-[9px] px-2.5 py-[9px] text-left text-[13px] transition-colors",
+                transformsOpen
+                  ? "bg-raise-2 text-ink"
+                  : "text-ink-3 hover:bg-raise hover:text-ink-2",
+              )}
+            >
+              <ArrowRightLeft aria-hidden className="size-3.5" />
+              Transforms
+            </button>
             <button
               type="button"
               onClick={onToggleFormatting}

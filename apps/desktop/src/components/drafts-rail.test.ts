@@ -21,11 +21,13 @@ describe("DraftsRail", () => {
         drafts,
         activeId: "draft-1",
         formattingOpen: false,
+        transformsOpen: false,
         onSelect: vi.fn(),
         onDelete: vi.fn(),
         onCreate: vi.fn(),
         onToggleOpen: vi.fn(),
         onToggleFormatting: vi.fn(),
+        onToggleTransforms: vi.fn(),
       }),
     );
 
