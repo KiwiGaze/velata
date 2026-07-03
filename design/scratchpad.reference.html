@@ -183,22 +183,22 @@
       sheet.className='sheet';setToggle(1);tag.textContent='zh → en';
       editor.className='editor empty';
       editor.innerHTML=`<span class="lead">Speak, or just type.</span><span class="sub">Your words land here — refine before they go anywhere.</span>`;
-      caption.innerHTML='';hints.innerHTML=HINT_DEFAULT;meta.textContent='GLM-4 · local';
+      caption.innerHTML='';hints.innerHTML=HINT_DEFAULT;meta.textContent='GLM-4 · local mode';
     },
     editing(){
       sheet.className='sheet';setToggle(1);tag.textContent='zh → en';
       editor.className='editor';editor.innerHTML=MESSY;
-      caption.innerHTML=`<span>42 words</span><span>draft saved</span>`;hints.innerHTML=HINT_DEFAULT;meta.textContent='GLM-4 · local';
+      caption.innerHTML=`<span>42 words</span><span>draft saved</span>`;hints.innerHTML=HINT_DEFAULT;meta.textContent='GLM-4 · local mode';
     },
     refining(){
       sheet.className='sheet refining';setToggle(1);tag.textContent='zh → en';
       editor.className='editor dim';editor.innerHTML=MESSY;
-      caption.innerHTML=`<span class="u">Refining…</span>`;hints.innerHTML=`<div class="hint"><span class="keycap">esc</span> Cancel</div>`;meta.textContent='GLM-4 · local';
+      caption.innerHTML=`<span class="u">Refining…</span>`;hints.innerHTML=`<div class="hint"><span class="keycap">esc</span> Cancel</div>`;meta.textContent='GLM-4 · local mode';
     },
     refined(){
       sheet.className='sheet';setToggle(1);tag.textContent='zh → en';
       editor.className='editor';editor.innerHTML=CLEAN;
-      caption.innerHTML=`<span class="u">Refined</span><span>⌘Z to undo</span>`;hints.innerHTML=HINT_DEFAULT;meta.textContent='GLM-4 · local';
+      caption.innerHTML=`<span class="u">Refined</span><span>⌘Z to undo</span>`;hints.innerHTML=HINT_DEFAULT;meta.textContent='GLM-4 · local mode';
     },
     drafts(){
       sheet.className='sheet rail-open';setToggle(5);tag.textContent='zh → en';

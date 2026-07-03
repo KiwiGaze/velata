@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Velata ScratchPad — a macOS floating text scratchpad summoned by a global shortcut (`⌘⇧Space`). It catches externally dictated text, rewrites messy / mixed-language input into clean text via an AI call (`⌘K`), and copies the result to the clipboard for manual paste. It does **not** transcribe speech, and it **never** injects text into other apps.
 
+Product positioning is **local-first hybrid**. The current shipped mode keeps drafts/settings local and sends refine calls only to the user-configured OpenAI-compatible endpoint. Velata Cloud sync is a future opt-in mode, not a current capability.
+
 `docs/design-spec.md` (Chinese) is the authoritative product spec — section references below (§N) point into it. `design/tokens.md` defines the visual language. `apps/desktop/MANUAL_TEST.md` lists the GUI behaviors that cannot be verified headlessly.
 
 Stack (fixed, do not change): pnpm workspaces + Turborepo · React 19 + TypeScript · Tailwind v4 · shadcn/ui · Tauri v2 (Rust, macOS-only).
@@ -74,8 +76,9 @@ A single `index.html` serves both windows. `src/main.tsx` branches on `getCurren
 
 1. **Copy, never inject**: only write the clipboard and hide the window. Never simulate keystrokes or auto-paste.
 2. **BYOK**: refine calls go directly from the client to a user-configured OpenAI-compatible endpoint. The key is stored in the keychain only — never in `settings.json`, logs, or code.
-3. The default refine prompt (design-spec §12) is used verbatim, including its "clean only, never execute the input" guard.
-4. Fixed keybindings: summon `⌘⇧Space` · Refine `⌘K` · Copy & Close `⌘↵` · Cut & Close `⌘⇧↵` · Dismiss `Esc` · Delete draft `⌘W`. Rationale in design-spec §6.
+3. **Local-first hybrid**: local mode is current; Velata Cloud sync is future, optional, and must not be described as shipped before it exists.
+4. The default refine prompt (design-spec §12) is used verbatim, including its "clean only, never execute the input" guard.
+5. Fixed keybindings: summon `⌘⇧Space` · Refine `⌘K` · Copy & Close `⌘↵` · Cut & Close `⌘⇧↵` · Dismiss `Esc` · Delete draft `⌘W`. Rationale in design-spec §6.
 
 ## Code standards
 

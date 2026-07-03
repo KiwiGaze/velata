@@ -165,10 +165,7 @@ export function ModelPane(): ReactElement {
 
   return (
     <section>
-      <PaneHeader
-        title="Model"
-        subtitle="Bring your own key. Any OpenAI-compatible endpoint works."
-      />
+      <PaneHeader title="Model" subtitle="Local mode uses any OpenAI-compatible endpoint." />
       <SettingsRow label="Provider">
         <Select value={settings.provider} onValueChange={handleProviderChange}>
           <SelectTrigger className="w-[220px]" aria-label="Provider">
@@ -232,7 +229,8 @@ export function ModelPane(): ReactElement {
           onBlur={saveKey}
         />
         <p className="text-ink-3 text-[12px] leading-[1.45]">
-          Stored in your device keychain. It only ever goes to your provider — never to us.
+          Stored in your device keychain. Local-mode requests go only to this endpoint, never to
+          Velata.
         </p>
       </div>
 

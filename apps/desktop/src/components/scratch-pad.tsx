@@ -406,7 +406,7 @@ export function ScratchPad(): ReactElement {
 
             <footer className="border-line @container flex items-center justify-between gap-4 border-t px-[22px] py-[13px]">
               <FooterHints hints={refining ? REFINING_HINTS : DEFAULT_HINTS} />
-              <span className="text-ink-3 min-w-0 truncate font-mono text-[11px] @max-[30rem]:hidden">{`${model} · local`}</span>
+              <span className="text-ink-3 min-w-0 truncate font-mono text-[11px] @max-[30rem]:hidden">{`${model} · local mode`}</span>
             </footer>
           </div>
         </div>
