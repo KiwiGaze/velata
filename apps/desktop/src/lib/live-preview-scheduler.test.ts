@@ -271,9 +271,9 @@ describe("previewCopyText", () => {
   });
 
   it("falls back to source on error and idle", () => {
-    expect(
-      previewCopyText({ text: "refined", phase: "error", errorMessage: "boom" }, source),
-    ).toBe(source);
+    expect(previewCopyText({ text: "refined", phase: "error", errorMessage: "boom" }, source)).toBe(
+      source,
+    );
     expect(previewCopyText({ text: "", phase: "idle" }, source)).toBe(source);
   });
 });

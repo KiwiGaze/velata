@@ -1,11 +1,7 @@
 import { cn } from "@velata/ui";
 import { type ReactElement, type ReactNode } from "react";
 
-import {
-  type FormattedMarkdown,
-  type MarkdownLine,
-  type MarkdownRun,
-} from "@/lib/markdown-format";
+import { type FormattedMarkdown, type MarkdownLine, type MarkdownRun } from "@/lib/markdown-format";
 
 function markerLabel(line: MarkdownLine): string | null {
   switch (line.kind) {
