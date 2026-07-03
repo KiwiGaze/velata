@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { DEFAULT_INSTRUCTION, type Instruction, isBlank } from "@velata/core";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@velata/ui";
+import { Button, Select, SelectContent, SelectItem, SelectTrigger } from "@velata/ui";
 import { X } from "lucide-react";
 import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
 
@@ -368,14 +368,15 @@ export function ScratchPad(): ReactElement {
                 ))}
               </SelectContent>
             </Select>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={handleDismiss}
               aria-label="Close"
-              className="text-ink-3 hover:bg-raise hover:text-ink flex size-7 items-center justify-center rounded-[7px] transition-colors"
+              className="text-ink-3 hover:bg-raise hover:text-ink size-7 rounded-[7px] border-0 bg-transparent p-0 transition-colors"
             >
               <X aria-hidden className="size-3.5" />
-            </button>
+            </Button>
           </div>
 
           <Editor

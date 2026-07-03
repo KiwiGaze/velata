@@ -478,7 +478,7 @@ export function Editor({
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           className={cn(
-            "caret-ink focus-visible:ring-0 min-h-full cursor-text text-[18px] leading-[1.72] tracking-[-0.003em] whitespace-pre-wrap outline-none",
+            "caret-ink focus-visible:ring-ring min-h-full cursor-text text-[18px] leading-[1.72] tracking-[-0.003em] whitespace-pre-wrap outline-none focus-visible:ring-2",
             dimmed ? "text-ink-2" : "text-ink",
           )}
         >
