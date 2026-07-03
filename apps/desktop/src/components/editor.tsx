@@ -10,10 +10,9 @@ import {
   useRef,
 } from "react";
 
+import { MarkdownView } from "@/components/markdown-view";
 import {
   type FormattedMarkdown,
-  type MarkdownLine,
-  type MarkdownRun,
   parseFormattedMarkdown,
   sourceOffsetFromVisibleOffset,
   visibleOffsetFromSourceOffset,
@@ -291,75 +290,6 @@ function serializeEditor(root: HTMLElement): string {
     .join("\n");
 }
 
-function markerLabel(line: MarkdownLine): string | null {
-  switch (line.kind) {
-    case "bullet":
-      return "•";
-    case "numbered":
-      return line.marker.trim();
-    case "check":
-      return /^- \[[xX]\] /.test(line.marker) ? "☑" : "□";
-    case "quote":
-    case "plain":
-      return null;
-  }
-}
-
-function renderRun(run: MarkdownRun, key: string): ReactNode {
-  const mark = run.marks.join(" ");
-  const className = cn(
-    run.marks.includes("bold") && "font-semibold",
-    run.marks.includes("italic") && "italic",
-    run.marks.includes("code") && "bg-raise rounded-[4px] px-1 font-mono text-[0.92em]",
-    run.marks.includes("link") && "underline decoration-1 underline-offset-[3px]",
-  );
-
-  if (mark.length === 0) {
-    return <span key={key}>{run.text}</span>;
-  }
-
-  return (
-    <span key={key} data-editor-mark={mark} data-editor-url={run.url} className={className}>
-      {run.text}
-    </span>
-  );
-}
-
-function renderLine(line: MarkdownLine, index: number): ReactNode {
-  const marker = markerLabel(line);
-  return (
-    <div
-      key={`${line.sourceStart.toString()}-${index.toString()}`}
-      data-editor-line="true"
-      data-source-marker={line.marker}
-      className={cn(
-        "min-h-[1.72em] cursor-text",
-        line.kind === "quote" && "border-line-2 border-l pl-4",
-        line.kind !== "plain" && line.kind !== "quote" && "flex gap-3",
-      )}
-    >
-      {marker === null ? null : (
-        <span
-          data-editor-marker="true"
-          contentEditable={false}
-          className="text-ink-3 mt-[0.05em] w-5 shrink-0 select-none text-right"
-        >
-          {marker}
-        </span>
-      )}
-      <span data-editor-content="true" className="min-w-0 flex-1">
-        {line.runs.length > 0 ? (
-          line.runs.map((run, runIndex) =>
-            renderRun(run, `${index.toString()}-${runIndex.toString()}`),
-          )
-        ) : (
-          <br />
-        )}
-      </span>
-    </div>
-  );
-}
-
 /** The hero editing surface: a rendered Markdown editor with optional overlay and formatting toolbar. */
 export function Editor({
   value,
@@ -482,7 +412,9 @@ export function Editor({
             dimmed ? "text-ink-2" : "text-ink",
           )}
         >
-          <div key={value}>{formatted.lines.map(renderLine)}</div>
+          <div key={value}>
+            <MarkdownView document={formatted} />
+          </div>
         </div>
       </div>
       {overlay}
