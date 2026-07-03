@@ -5,6 +5,8 @@
     </filter>
   </defs>
   <rect x="100" y="100" width="824" height="824" rx="186" fill="#FCFCFD" stroke="#E0E2E7" stroke-width="6" filter="url(#tile-shadow)"/>
-  <path d="M310 330 512 690" stroke="#191B20" stroke-opacity=".45" stroke-width="96" stroke-linecap="round"/>
-  <path d="M714 330 512 690" stroke="#191B20" stroke-width="96" stroke-linecap="round"/>
+  <g transform="translate(512 512) scale(1.55) translate(-256 -256)">
+    <path fill="#191B20" d="M166 108 H274 A58 58 0 0 1 331 156 H238 A82 82 0 0 0 156 238 V331 A58 58 0 0 1 108 274 V166 A58 58 0 0 1 166 108 Z"/>
+    <path fill="#191B20" d="M238 180 H346 A58 58 0 0 1 404 238 V346 A58 58 0 0 1 346 404 H238 A58 58 0 0 1 180 346 V238 A58 58 0 0 1 238 180 Z"/>
+  </g>
 </svg>
