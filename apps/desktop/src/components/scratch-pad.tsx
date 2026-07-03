@@ -56,6 +56,7 @@ export function ScratchPad(): ReactElement {
     useDrafts();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [railOpen, setRailOpen] = useState(false);
+  const [formattingOpen, setFormattingOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -324,9 +325,13 @@ export function ScratchPad(): ReactElement {
             open={railOpen}
             drafts={drafts}
             activeId={activeId}
+            formattingOpen={formattingOpen}
             onSelect={handleSelectDraft}
             onDelete={handleDeleteDraft}
             onCreate={handleCreateDraft}
+            onToggleFormatting={() => {
+              setFormattingOpen((open) => !open);
+            }}
           />
 
           <div className="flex min-w-0 flex-1 flex-col">

@@ -62,12 +62,24 @@ menu bars.
 
 ## 5. Drafts
 
-1. Click the `Drafts · N` toggle → the rail slides open with the draft list.
-2. Create several drafts (rail "+ New draft" or the tray "New draft"). Long titles clamp to two
-   lines; hover a truncated one → tooltip shows the full text.
+1. Click the `Drafts · N` toggle → the rail slides open. Top to bottom it holds: a pinned
+   **New draft** row (pen icon), the search field, the scrolling draft list, and a pinned
+   **Formatting** row at the bottom.
+2. Create several drafts (the pinned **New draft** row at the top of the rail, or the tray
+   "New draft"). Long titles clamp to two lines; hover a truncated one → tooltip shows the full
+   text.
 3. ⌘1–9 switches; the active draft is highlighted. ⌘W deletes the current one (the list is never
    empty). Summoning with an empty current draft reuses it (setting: "Reuse empty draft on open").
 4. Quit and relaunch → your drafts are still there (persisted, debounced writes).
+5. **Search:** type in the search field → the list filters to drafts whose title OR body contains
+   the query. Matched substrings render emphasized (semibold + underline, still zero-color — no
+   yellow), and each hit shows a one-line body snippet with `…` around the first body match.
+6. The **X** button (shown only while the field has text) clears the query. In the search field,
+   **Esc** clears a non-empty query and keeps the window open; pressing **Esc** again on the now
+   empty field hides the window as usual.
+7. A query that matches nothing shows `No matching drafts` in place of the list.
+8. The **Formatting** row at the rail bottom toggles its pressed styling (`aria-pressed`) on each
+   click. The floating toolbar it opens is covered in a later section.
 
 ## 6. Instruction palette (⌘P)
 

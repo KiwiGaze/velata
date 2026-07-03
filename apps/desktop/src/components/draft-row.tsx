@@ -1,36 +1,62 @@
 import { cn, Tooltip, TooltipContent, TooltipTrigger } from "@velata/ui";
 import { Trash2 } from "lucide-react";
-import { type ReactElement, useEffect, useRef, useState } from "react";
+import { type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { type Draft } from "@/hooks/use-drafts";
+import { type DraftMatch, firstNonEmptyLine, type HighlightRange } from "@/lib/draft-search";
 import { formatRelativeTime } from "@/lib/relative-time";
 
 interface DraftRowProps {
   draft: Draft;
   active: boolean;
   now: number;
+  match?: DraftMatch;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
 }
 
-function firstNonEmptyLine(text: string): string | null {
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.length > 0) {
-      return trimmed;
-    }
+function renderHighlighted(text: string, ranges: HighlightRange[]): ReactNode {
+  if (ranges.length === 0) {
+    return text;
   }
-  return null;
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  for (const [index, range] of ranges.entries()) {
+    if (range.start > cursor) {
+      nodes.push(text.slice(cursor, range.start));
+    }
+    nodes.push(
+      <mark
+        key={index}
+        className="bg-transparent text-ink font-semibold underline decoration-1 underline-offset-[2px]"
+      >
+        {text.slice(range.start, range.end)}
+      </mark>,
+    );
+    cursor = range.end;
+  }
+  if (cursor < text.length) {
+    nodes.push(text.slice(cursor));
+  }
+  return nodes;
 }
 
-/** A single draft entry in the rail: a two-line clamped title, a timestamp, and hover delete. */
-export function DraftRow({ draft, active, now, onSelect, onDelete }: DraftRowProps): ReactElement {
+/** A single draft entry in the rail: a two-line clamped title, a timestamp, an optional match snippet, and hover delete. */
+export function DraftRow({
+  draft,
+  active,
+  now,
+  match,
+  onSelect,
+  onDelete,
+}: DraftRowProps): ReactElement {
   const titleRef = useRef<HTMLSpanElement>(null);
   const [truncated, setTruncated] = useState(false);
 
   const title = firstNonEmptyLine(draft.text);
   const isEmpty = title === null;
   const label = title ?? "New draft";
+  const snippet = match?.snippet ?? null;
 
   useEffect(() => {
     const element = titleRef.current;
@@ -38,7 +64,7 @@ export function DraftRow({ draft, active, now, onSelect, onDelete }: DraftRowPro
       return;
     }
     setTruncated(element.scrollHeight > element.clientHeight + 1);
-  }, [label]);
+  }, [label, match?.titleRanges]);
 
   const row = (
     <button
@@ -57,11 +83,18 @@ export function DraftRow({ draft, active, now, onSelect, onDelete }: DraftRowPro
           ref={titleRef}
           className={cn("line-clamp-2 text-[13px] leading-[1.45]", isEmpty && "text-ink-3")}
         >
-          {label}
+          {match && match.titleRanges.length > 0
+            ? renderHighlighted(label, match.titleRanges)
+            : label}
         </span>
         <span className="text-ink-3 font-mono text-[10.5px] font-normal">
           {formatRelativeTime(draft.updatedAt, now)}
         </span>
+        {snippet ? (
+          <span className="text-ink-3 truncate text-[11px] leading-[1.4]">
+            {renderHighlighted(snippet.text, snippet.ranges)}
+          </span>
+        ) : null}
       </span>
     </button>
   );
