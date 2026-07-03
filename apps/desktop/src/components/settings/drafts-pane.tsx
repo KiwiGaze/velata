@@ -1,4 +1,4 @@
-import { Switch } from "@velata/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from "@velata/ui";
 import { type ReactElement } from "react";
 
 import { useSettings } from "@/hooks/use-settings";
@@ -11,6 +11,27 @@ export function DraftsPane(): ReactElement {
   return (
     <section>
       <PaneHeader title="Drafts" subtitle="How the draft list behaves." />
+      <SettingsRow
+        label="When summoned"
+        description="Open a fresh draft or continue the one you last worked on."
+      >
+        <Select
+          value={settings.summonBehavior}
+          onValueChange={(value) => {
+            void updateSettings({
+              summonBehavior: value === "recent-draft" ? "recent-draft" : "new-draft",
+            });
+          }}
+        >
+          <SelectTrigger className="w-[220px]" aria-label="When summoned">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="new-draft">New draft</SelectItem>
+            <SelectItem value="recent-draft">Most recent draft</SelectItem>
+          </SelectContent>
+        </Select>
+      </SettingsRow>
       <SettingsRow
         label="Reuse empty draft on open"
         description="Don't create a new blank draft if the current one is still empty."
