@@ -63,8 +63,8 @@ dark menu bars, and that the gap between the two panes stays visible at menu-bar
 ## 5. Drafts
 
 1. Click the `Drafts · N` toggle → the rail slides open. Top to bottom it holds: a pinned
-   **New draft** row (pen icon), the search field, the scrolling draft list, and a pinned
-   **Formatting** row at the bottom.
+   **New draft** row (pen icon), the search field, the scrolling draft list, and two pinned
+   rows at the bottom — **Transforms** above **Formatting**.
 2. Create several drafts (the pinned **New draft** row at the top of the rail, or the tray
    "New draft"). The list stays ordered newest first: a new draft appears at the top, and
    editing an older draft moves it to the top. Long titles clamp to two lines; hover a
@@ -179,3 +179,28 @@ be verified on a real GUI session.
     the result lands (applying a format in the `Refined` state edits the text and dismisses the diff,
     exactly like typing).
 15. Click the **Formatting** row again → the toolbar hides.
+
+## 11. Transforms bar
+
+1. Open the drafts rail → the bottom pins two rows: **Transforms** (above) and **Formatting**. Click
+   **Transforms** → it takes the pressed styling and a monochrome floating bar appears bottom-center over
+   the editor: three text chips (e.g. `More concise`, `Turn to list`, `Polish`) and a **New batch** refresh
+   button. Confirm zero color anywhere (ink on paper, hairline border, neutral drop shadow).
+2. **Mutually exclusive with Formatting:** click **Formatting** → the Transforms bar closes and the
+   Formatting toolbar opens; click **Transforms** again → the reverse. Only one floating bar shows at a time.
+3. **New batch:** click the refresh button → the three chips are replaced by a different random three drawn
+   from the built-in pool (~12 presets); the set visibly changes and does not repeat the previous three.
+4. **Run a transform:** type some text → click a chip → it runs exactly like ⌘K (top progress line, text
+   dims, `Refining…`, then the before/after diff with `⌘Z to undo`). The result reflects the chosen
+   transform (e.g. `More concise` shortens it, `Turn to list` bullets it).
+5. **Selection scope:** select part of the text → click a chip → only the selection is transformed and
+   replaced; with no selection the whole draft is transformed.
+6. **Focus is never stolen:** make a selection, then click a chip → the selection stays visible (the press
+   does not collapse the caret or blur the editor), so the intended text is what gets transformed.
+7. **Empty draft:** with a blank draft the chips are disabled (dimmed, not clickable); the **New batch**
+   button still works.
+8. **Refining:** while a transform is in flight the bar hides (like the Formatting toolbar), then returns
+   once the result lands. The shown three stay the same across open/close; only **New batch** changes them.
+9. **Language preserved:** run a transform on non-English text → the output stays in the input's language
+   (transforms rewrite, they do not translate).
+10. Click the **Transforms** row again → the bar hides.

@@ -14,3 +14,4 @@ export {
 } from "./instruction";
 export { buildSystemPrompt } from "./prompt";
 export { isBlank } from "./text";
+export { TRANSFORM_PRESETS } from "./transform-presets";
