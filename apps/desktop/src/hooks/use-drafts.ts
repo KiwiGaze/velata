@@ -43,11 +43,16 @@ function init(): DraftsState {
   return { drafts: [draft], activeId: draft.id };
 }
 
-function reduce(state: DraftsState, action: DraftsAction): DraftsState {
+function byNewestFirst(left: Draft, right: Draft): number {
+  return right.updatedAt - left.updatedAt;
+}
+
+/** Pure reducer for the drafts workspace; keeps the list ordered newest first. */
+export function reduceDrafts(state: DraftsState, action: DraftsAction): DraftsState {
   switch (action.type) {
     case "create": {
       const draft = makeDraft();
-      return { drafts: [...state.drafts, draft], activeId: draft.id };
+      return { drafts: [draft, ...state.drafts], activeId: draft.id };
     }
     case "select": {
       if (!state.drafts.some((draft) => draft.id === action.id)) {
@@ -73,11 +78,13 @@ function reduce(state: DraftsState, action: DraftsAction): DraftsState {
     case "update": {
       return {
         ...state,
-        drafts: state.drafts.map((draft) =>
-          draft.id === state.activeId
-            ? { ...draft, text: action.text, updatedAt: Date.now() }
-            : draft,
-        ),
+        drafts: state.drafts
+          .map((draft) =>
+            draft.id === state.activeId
+              ? { ...draft, text: action.text, updatedAt: Date.now() }
+              : draft,
+          )
+          .sort(byNewestFirst),
       };
     }
     case "hydrate": {
@@ -85,7 +92,8 @@ function reduce(state: DraftsState, action: DraftsAction): DraftsState {
       if (!isPristine || action.workspace.drafts.length === 0) {
         return state;
       }
-      const { drafts, activeId } = action.workspace;
+      const { activeId } = action.workspace;
+      const drafts = [...action.workspace.drafts].sort(byNewestFirst);
       const resolvedId = drafts.some((draft) => draft.id === activeId)
         ? activeId
         : (drafts[0]?.id ?? activeId);
@@ -94,9 +102,9 @@ function reduce(state: DraftsState, action: DraftsAction): DraftsState {
   }
 }
 
-/** Manages the in-memory multi-draft workspace; the list is never empty. */
+/** Manages the in-memory multi-draft workspace; the list is never empty and stays newest first. */
 export function useDrafts(): DraftsController {
-  const [state, dispatch] = useReducer(reduce, undefined, init);
+  const [state, dispatch] = useReducer(reduceDrafts, undefined, init);
   const [hydrated, setHydrated] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestRef = useRef<Workspace | null>(null);

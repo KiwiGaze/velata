@@ -66,8 +66,9 @@ dark menu bars, and that the gap between the two panes stays visible at menu-bar
    **New draft** row (pen icon), the search field, the scrolling draft list, and a pinned
    **Formatting** row at the bottom.
 2. Create several drafts (the pinned **New draft** row at the top of the rail, or the tray
-   "New draft"). Long titles clamp to two lines; hover a truncated one → tooltip shows the full
-   text.
+   "New draft"). The list stays ordered newest first: a new draft appears at the top, and
+   editing an older draft moves it to the top. Long titles clamp to two lines; hover a
+   truncated one → tooltip shows the full text.
 3. ⌘1–9 switches; the active draft is highlighted. ⌘W deletes the current one (the list is never
    empty). Summoning with an empty current draft reuses it (setting: "Reuse empty draft on open").
 4. Quit and relaunch → your drafts are still there (persisted, debounced writes).
