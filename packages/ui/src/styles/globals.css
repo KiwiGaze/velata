@@ -3,7 +3,6 @@
 
 @source "../";
 
-/* Clean-sheet tokens — source of truth: design/tokens.md */
 :root {
   --paper: #fcfcfd;
   --raise: #f2f3f6;

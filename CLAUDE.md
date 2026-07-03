@@ -8,7 +8,7 @@ Velata ScratchPad — a macOS floating text scratchpad summoned by a global shor
 
 Product positioning is **local-first hybrid**. The current shipped mode keeps drafts/settings local and sends refine calls only to the user-configured OpenAI-compatible endpoint. Velata Cloud sync is a future opt-in mode, not a current capability.
 
-`docs/design-spec.md` (Chinese) is the authoritative product spec — section references below (§N) point into it. `design/tokens.md` defines the visual language. `apps/desktop/MANUAL_TEST.md` lists the GUI behaviors that cannot be verified headlessly.
+`apps/desktop/MANUAL_TEST.md` lists the GUI behaviors that cannot be verified headlessly. Current product constraints live in this file, `README.md`, `CONTRIBUTING.md`, and the implementation.
 
 Stack (fixed, do not change): pnpm workspaces + Turborepo · React 19 + TypeScript · Tailwind v4 · shadcn/ui · Tauri v2 (Rust, macOS-only).
 
@@ -48,7 +48,7 @@ CI (`.github/workflows/ci.yml`, macos runner) requires all of: typecheck, lint, 
 
 Monorepo rule: `apps/*` may depend on `packages/*`, never the reverse; no cycles. All packages are consumed **as source** (`exports` point at `src/`) — nothing except the desktop app has a build step.
 
-- **`packages/core`** — provider-agnostic refine logic. Pure TypeScript: no React, no Tauri imports. Holds the `Instruction` model, the default refine prompt (design-spec §12, with the literal `{target}` token substituted by `buildSystemPrompt`), and `refine()` / `testConnection()` against any OpenAI-compatible `/chat/completions` endpoint. Network access is injected via `fetchImpl`, which is what keeps it platform-agnostic and unit-testable. All Vitest tests live here and must keep covering the three §12 acceptance cases.
+- **`packages/core`** — provider-agnostic refine logic. Pure TypeScript: no React, no Tauri imports. Holds the `Instruction` model, the default refine prompt (with the literal `{target}` token substituted by `buildSystemPrompt`), and `refine()` / `testConnection()` against any OpenAI-compatible `/chat/completions` endpoint. Network access is injected via `fetchImpl`, which is what keeps it platform-agnostic and unit-testable. All Vitest tests live here.
 - **`packages/ui`** — shadcn/ui copy-in components (Radix) plus `globals.css` tokens. Components are stripped of default rounding/shadow/color to match the clean-sheet design language.
 - **`packages/config`** — shared `tsconfig.base.json`, the `velataEslint({ tsconfigRootDir })` flat-config factory, and Prettier config.
 - **`apps/desktop`** — the Tauri v2 app.
@@ -61,7 +61,7 @@ A single `index.html` serves both windows. `src/main.tsx` branches on `getCurren
 
 - The app runs as an **Accessory** (no Dock icon) and lives in the menu-bar tray. Opening Settings flips the activation policy to Regular; destroying that window flips it back.
 - The main window is converted to an **NSPanel** via `tauri-nspanel` (non-activating floating panel, joins all Spaces) so it can take keyboard focus over any app, including full-screen ones.
-- **Focus steal + return is THE critical behavior** (design-spec §7.1): `remember_previous_app` records the frontmost app's PID before showing the panel; `hide_scratchpad` reactivates it. This can only be verified manually — see `MANUAL_TEST.md` §2.
+- **Focus steal + return is THE critical behavior**: `remember_previous_app` records the frontmost app's PID before showing the panel; `hide_scratchpad` reactivates it. This can only be verified manually — see `MANUAL_TEST.md` section 2.
 - The global shortcut toggles the panel and emits `summon` / `new-draft` events that the React side listens for.
 - The API key lives **only** in the macOS keychain (`keyring` crate, service `com.velata.app`), exposed through the `get/set/delete_api_key` commands wrapped by `src/lib/keychain.ts`.
 
@@ -77,8 +77,8 @@ A single `index.html` serves both windows. `src/main.tsx` branches on `getCurren
 1. **Copy, never inject**: only write the clipboard and hide the window. Never simulate keystrokes or auto-paste.
 2. **BYOK**: refine calls go directly from the client to a user-configured OpenAI-compatible endpoint. The key is stored in the keychain only — never in `settings.json`, logs, or code.
 3. **Local-first hybrid**: local mode is current; Velata Cloud sync is future, optional, and must not be described as shipped before it exists.
-4. The default refine prompt (design-spec §12) is used verbatim, including its "clean only, never execute the input" guard.
-5. Fixed keybindings: summon `⌘⇧Space` · Refine `⌘K` · Copy & Close `⌘↵` · Cut & Close `⌘⇧↵` · Dismiss `Esc` · Delete draft `⌘W`. Rationale in design-spec §6.
+4. The default refine prompt is used verbatim, including its "clean only, never execute the input" guard.
+5. Fixed keybindings: summon `⌘⇧Space` · Refine `⌘K` · Copy & Close `⌘↵` · Cut & Close `⌘⇧↵` · Dismiss `Esc` · Delete draft `⌘W`.
 
 ## Code standards
 
@@ -88,7 +88,7 @@ A single `index.html` serves both windows. `src/main.tsx` branches on `getCurren
 
 ## UI rules
 
-- Strictly follow `design/tokens.md`: light cool palette, **zero color**, native macOS fonts (SF Pro through `-apple-system` / `system-ui`, SF Mono for mono), generous whitespace, near-black ink as the only accent. `design/*.reference.html` are visual references only — rebuild in React + shadcn, never copy their HTML.
-- Use shadcn components from `@velata/ui`, not raw HTML elements (component mapping: design-spec §11.2).
+- Use the shared tokens in `packages/ui/src/styles/globals.css`: light cool palette, **zero color**, native macOS fonts (SF Pro through `-apple-system` / `system-ui`, SF Mono for mono), generous whitespace, near-black ink as the only accent.
+- Use shadcn components from `@velata/ui`, not raw HTML elements.
 - Every screen implements all of its states (scratchpad: empty / editing / refining / refined / multi-draft; each settings pane; onboarding).
 - Fully keyboard-operable, visible `:focus-visible`, respect `prefers-reduced-motion`. Refining state uses the thin top `Progress` line — no color, no blinking.
