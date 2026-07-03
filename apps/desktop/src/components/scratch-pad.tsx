@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { DEFAULT_INSTRUCTION, type Instruction, isBlank } from "@velata/core";
+import { DEFAULT_INSTRUCTION, type Instruction, isBlank, TRANSFORM_PRESETS } from "@velata/core";
 import { Button, Select, SelectContent, SelectItem, SelectTrigger } from "@velata/ui";
 import { X } from "lucide-react";
 import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
@@ -14,12 +14,14 @@ import { FormattingToolbar } from "@/components/formatting-toolbar";
 import { InstructionPalette } from "@/components/instruction-palette";
 import { ProgressLine } from "@/components/progress-line";
 import { ResizeHandles } from "@/components/resize-handles";
+import { TransformBar } from "@/components/transform-bar";
 import { useDrafts } from "@/hooks/use-drafts";
 import { MissingApiKeyError, MissingModelError, useRefine } from "@/hooks/use-refine";
 import { useScratchpadKeys } from "@/hooks/use-scratchpad-keys";
 import { useSettings } from "@/hooks/use-settings";
 import { type FormatAction, planFormat } from "@/lib/apply-format";
 import { TARGET_OPTIONS, targetLanguageLabel, toTargetLanguage } from "@/lib/target-language";
+import { pickTransforms, TRANSFORM_COUNT } from "@/lib/transforms";
 
 type Phase =
   | { kind: "idle" }
@@ -60,6 +62,10 @@ export function ScratchPad(): ReactElement {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const [railOpen, setRailOpen] = useState(false);
   const [formattingOpen, setFormattingOpen] = useState(false);
+  const [transformsOpen, setTransformsOpen] = useState(false);
+  const [transformBatch, setTransformBatch] = useState<readonly Instruction[]>(() =>
+    pickTransforms(TRANSFORM_PRESETS, TRANSFORM_COUNT, []),
+  );
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [formatUndo, setFormatUndo] = useState<{
     text: string;
@@ -164,6 +170,10 @@ export function ScratchPad(): ReactElement {
       editorRef.current?.focus();
       editorRef.current?.setSelectionRange(plan.selectionStart, plan.selectionEnd);
     });
+  }
+
+  function handleShuffleTransforms(): void {
+    setTransformBatch((prev) => pickTransforms(TRANSFORM_PRESETS, TRANSFORM_COUNT, prev));
   }
 
   function handleRefine(chosen: Instruction = instruction): void {
@@ -337,6 +347,7 @@ export function ScratchPad(): ReactElement {
           drafts={drafts}
           activeId={activeId}
           formattingOpen={formattingOpen}
+          transformsOpen={transformsOpen}
           onSelect={handleSelectDraft}
           onDelete={handleDeleteDraft}
           onCreate={handleCreateDraft}
@@ -345,6 +356,11 @@ export function ScratchPad(): ReactElement {
           }}
           onToggleFormatting={() => {
             setFormattingOpen((open) => !open);
+            setTransformsOpen(false);
+          }}
+          onToggleTransforms={() => {
+            setTransformsOpen((open) => !open);
+            setFormattingOpen(false);
           }}
         />
 
@@ -395,8 +411,15 @@ export function ScratchPad(): ReactElement {
               ) : undefined
             }
             toolbar={
-              formattingOpen && phase.kind !== "refining" ? (
+              phase.kind === "refining" ? undefined : formattingOpen ? (
                 <FormattingToolbar onApply={handleApplyFormat} />
+              ) : transformsOpen ? (
+                <TransformBar
+                  presets={transformBatch}
+                  disabled={isBlank(activeText)}
+                  onRun={handleRefine}
+                  onShuffle={handleShuffleTransforms}
+                />
               ) : undefined
             }
           />
