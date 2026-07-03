@@ -74,6 +74,7 @@ menu bars.
 5. **Search:** type in the search field → the list filters to drafts whose title OR body contains
    the query. Matched substrings render emphasized (semibold + underline, still zero-color — no
    yellow), and each hit shows a one-line body snippet with `…` around the first body match.
+   Clicking **New draft** while a query is active clears the search so the new empty draft shows.
 6. The **X** button (shown only while the field has text) clears the query. In the search field,
    **Esc** clears a non-empty query and keeps the window open; pressing **Esc** again on the now
    empty field hides the window as usual.

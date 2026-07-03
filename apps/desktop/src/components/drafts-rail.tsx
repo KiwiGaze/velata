@@ -49,6 +49,11 @@ export function DraftsRail({
   const results = searchDrafts(drafts, query);
   const noMatches = query.trim().length > 0 && results.length === 0;
 
+  function handleCreate(): void {
+    setQuery("");
+    onCreate();
+  }
+
   return (
     <aside
       inert={!open}
@@ -64,7 +69,7 @@ export function DraftsRail({
           </div>
           <button
             type="button"
-            onClick={onCreate}
+            onClick={handleCreate}
             className="text-ink-3 hover:bg-raise hover:text-ink-2 flex items-center gap-[9px] rounded-[9px] px-2.5 py-[9px] text-left text-[13px] transition-colors"
           >
             <SquarePen aria-hidden className="size-3.5" />
