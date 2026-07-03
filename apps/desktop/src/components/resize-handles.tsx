@@ -34,6 +34,7 @@ interface Metrics {
 interface DragSession {
   horizontal: Axis;
   vertical: Axis;
+  minWidth: number;
   pointerStartX: number;
   pointerStartY: number;
   pointerX: number;
@@ -57,9 +58,9 @@ function applyResize(session: DragSession): void {
   let y = metrics.y;
 
   if (session.horizontal === 1) {
-    width = Math.max(MIN_WIDTH, metrics.width + deltaX);
+    width = Math.max(session.minWidth, metrics.width + deltaX);
   } else if (session.horizontal === -1) {
-    width = Math.max(MIN_WIDTH, metrics.width - deltaX);
+    width = Math.max(session.minWidth, metrics.width - deltaX);
     x = metrics.x + (metrics.width - width);
   }
 
@@ -77,7 +78,12 @@ function applyResize(session: DragSession): void {
   }
 }
 
-export function ResizeHandles(): ReactElement {
+interface ResizeHandlesProps {
+  /** Active lower bound for drag-resize width; split mode raises it. */
+  minWidth?: number;
+}
+
+export function ResizeHandles({ minWidth = MIN_WIDTH }: ResizeHandlesProps = {}): ReactElement {
   const sessionRef = useRef<DragSession | null>(null);
 
   function beginResize(event: ReactPointerEvent<HTMLDivElement>, handle: Handle): void {
@@ -93,6 +99,7 @@ export function ResizeHandles(): ReactElement {
     const session: DragSession = {
       horizontal: handle.horizontal,
       vertical: handle.vertical,
+      minWidth,
       pointerStartX: event.screenX,
       pointerStartY: event.screenY,
       pointerX: event.screenX,
