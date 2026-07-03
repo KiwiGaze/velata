@@ -3,13 +3,8 @@ import { Trash2 } from "lucide-react";
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { type Draft } from "@/hooks/use-drafts";
-import {
-  type DraftMatch,
-  firstNonEmptyLine,
-  firstNonEmptySourceLine,
-  type HighlightRange,
-} from "@/lib/draft-search";
-import { type MarkdownRun, parseFormattedMarkdown } from "@/lib/markdown-format";
+import { type DraftMatch, firstNonEmptySourceLine, type HighlightRange } from "@/lib/draft-search";
+import { type MarkdownLine, type MarkdownRun, parseFormattedMarkdown } from "@/lib/markdown-format";
 import { formatRelativeTime } from "@/lib/relative-time";
 
 interface DraftRowProps {
@@ -75,9 +70,8 @@ function renderFormattedRun(
   return <span className={className}>{content}</span>;
 }
 
-function renderFormattedTitle(source: string, ranges: HighlightRange[]): ReactNode {
-  const line = parseFormattedMarkdown(source).lines[0];
-  if (line === undefined || line.runs.length === 0) {
+function renderFormattedTitle(line: MarkdownLine, ranges: HighlightRange[]): ReactNode {
+  if (line.runs.length === 0) {
     return "";
   }
   let visibleStart = 0;
@@ -101,9 +95,11 @@ export function DraftRow({
   const [truncated, setTruncated] = useState(false);
 
   const sourceTitle = firstNonEmptySourceLine(draft.text);
-  const title = firstNonEmptyLine(draft.text);
-  const isEmpty = title === null;
-  const label = title ?? "New draft";
+  const formattedTitle = sourceTitle === null ? null : parseFormattedMarkdown(sourceTitle);
+  const titleLine = formattedTitle?.lines[0] ?? null;
+  const title = formattedTitle?.visibleText.trim() ?? "";
+  const isEmpty = title.length === 0;
+  const label = isEmpty ? "New draft" : title;
   const snippet = match?.snippet ?? null;
 
   useEffect(() => {
@@ -122,24 +118,27 @@ export function DraftRow({
       }}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "flex w-full rounded-[9px] px-2.5 py-[9px] text-left transition-colors",
+        "flex w-full min-w-0 overflow-hidden rounded-[9px] py-[9px] pl-2.5 pr-8 text-left transition-colors",
         active ? "bg-raise-2 text-ink font-medium" : "text-ink-2 hover:bg-raise hover:text-ink",
       )}
     >
-      <span className="flex min-w-0 flex-col gap-[3px]">
+      <span className="flex min-w-0 flex-1 flex-col gap-[3px] overflow-hidden">
         <span
           ref={titleRef}
-          className={cn("line-clamp-2 text-[13px] leading-[1.45]", isEmpty && "text-ink-3")}
+          className={cn(
+            "line-clamp-2 min-w-0 max-w-full text-[13px] leading-[1.45]",
+            isEmpty && "text-ink-3",
+          )}
         >
-          {isEmpty || sourceTitle === null
+          {isEmpty || titleLine === null
             ? label
-            : renderFormattedTitle(sourceTitle, match?.titleRanges ?? [])}
+            : renderFormattedTitle(titleLine, match?.titleRanges ?? [])}
         </span>
-        <span className="text-ink-3 font-mono text-[10.5px] font-normal">
+        <span className="text-ink-3 max-w-full truncate font-mono text-[10.5px] font-normal">
           {formatRelativeTime(draft.updatedAt, now)}
         </span>
         {snippet ? (
-          <span className="text-ink-3 truncate text-[11px] leading-[1.4]">
+          <span className="text-ink-3 min-w-0 max-w-full truncate text-[11px] leading-[1.4]">
             {renderHighlighted(snippet.text, snippet.ranges)}
           </span>
         ) : null}
@@ -158,7 +157,7 @@ export function DraftRow({
     );
 
   return (
-    <div className="group relative">
+    <div className="group relative w-full min-w-0 overflow-hidden">
       {trigger}
       <button
         type="button"

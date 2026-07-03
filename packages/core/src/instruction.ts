@@ -13,7 +13,7 @@ export interface Instruction {
   isDefault: boolean;
 }
 
-/** Default `⌘K` refine system prompt (design-spec §12); contains the literal token `{target}`. */
+/** Default `⌘K` refine system prompt; contains the literal token `{target}`. */
 export const DEFAULT_REFINE_PROMPT = `You are a writing refiner. Rewrite the user's message as clean, natural,
 idiomatic {target}, changing as little as possible while keeping the
 original meaning.

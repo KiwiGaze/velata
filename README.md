@@ -61,13 +61,11 @@ pnpm workspaces + Turborepo:
 
 - `apps/desktop` — the Tauri v2 app (React 19 frontend, Rust shell)
 - `packages/core` — provider-agnostic refine logic and prompt (pure TypeScript, unit-tested)
-- `packages/ui` — shadcn/ui components and design tokens
+- `packages/ui` — shadcn/ui components and shared CSS tokens
 - `packages/config` — shared TypeScript, ESLint, and Prettier config
 
 ## Documentation
 
-- `docs/design-spec.md` — the authoritative product spec (Chinese)
-- `design/tokens.md` — the visual language
 - `apps/desktop/MANUAL_TEST.md` — manual checklist for GUI behavior that cannot be tested headlessly
 - `CLAUDE.md` — development brief and architecture notes
 

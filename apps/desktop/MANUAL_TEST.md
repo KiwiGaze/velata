@@ -33,7 +33,7 @@ dark menu bars, and that the gap between the two panes stays visible at menu-bar
    empty ScratchPad. (Or click **I'll add a key later** to skip.)
 3. Quit and relaunch → onboarding does NOT appear again (the `onboarded` flag persisted).
 
-## 2. Focus steal + return — THE critical behavior (design-spec §7.1)
+## 2. Focus steal + return — THE critical behavior
 
 1. Click into a terminal so it is frontmost; type a couple chars to confirm it has focus.
 2. Press **⌘⇧Space** → Velata floats up, on top, and the caret is in its editor. Type — the
@@ -42,7 +42,7 @@ dark menu bars, and that the gap between the two panes stays visible at menu-bar
    text goes to the terminal. **This focus-return is the pass/fail gate.** If it fails, the
    documented fallback is the `tauri-nspanel` spotlight pattern.
 
-## 3. Core loop (design-spec §9)
+## 3. Core loop
 
 1. Summon, type or dictate messy/mixed text (e.g. `帮我 refactor 这个 useAuth hook…`).
 2. Press **⌘K** → top progress line animates, text dims, caption shows `Refining…`.
@@ -135,8 +135,8 @@ be verified on a real GUI session.
 6. Summon/hide (⌘⇧Space, Esc) and refine still work after a resize.
 7. **Not persisted (by design):** quit and relaunch → the sheet reopens at the default 740×480,
    not the size you left it at.
-8. **Re-run §2 end-to-end.** Enabling `.resizable()` changes the panel style mask that also carries
-   the non-activating bit behind the §7.1 focus-return. Confirm the full round-trip still holds:
+8. **Re-run section 2 end-to-end.** Enabling `.resizable()` changes the panel style mask that also carries
+   the non-activating bit behind focus-return. Confirm the full round-trip still holds:
    type into a terminal → ⌘⇧Space → type into Velata → Esc → the terminal is frontmost and receives
    typing again. If this regresses, drop `.resizable()` from the style mask in `lib.rs` — the JS
    `Math.max(MIN_WIDTH/MIN_HEIGHT, …)` clamp already enforces the minimum size on its own.
