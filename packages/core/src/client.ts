@@ -101,24 +101,48 @@ function buildChatCompletionsUrl(baseUrl: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
 }
 
-function parseRefinedText(payload: unknown): string {
-  const content = extractContent(payload);
-  if (content === undefined) {
-    throw new Error("Unexpected response: missing choices[0].message.content");
-  }
-  return content.trim();
+const REASONING_ONLY_ERROR =
+  "The model returned only reasoning, no refined text. Try a non-reasoning model.";
+
+const LEADING_THINK_BLOCK = /^\s*<think>[\s\S]*?<\/think>\s*/i;
+
+/** Removes a leading `<think>…</think>` reasoning block, then trims. */
+function stripReasoning(content: string): string {
+  return content.replace(LEADING_THINK_BLOCK, "").trim();
 }
 
-function extractContent(payload: unknown): string | undefined {
+function parseRefinedText(payload: unknown): string {
+  const message = extractMessage(payload);
+  const rawContent = message?.["content"];
+  if (typeof rawContent !== "string") {
+    if (message !== undefined && hasReasoning(message)) {
+      throw new Error(REASONING_ONLY_ERROR);
+    }
+    throw new Error("Unexpected response: missing choices[0].message.content");
+  }
+  const cleaned = stripReasoning(rawContent);
+  if (
+    cleaned.length === 0 &&
+    (/<think>/i.test(rawContent) || (message !== undefined && hasReasoning(message)))
+  ) {
+    throw new Error(REASONING_ONLY_ERROR);
+  }
+  return cleaned;
+}
+
+function extractMessage(payload: unknown): Record<string, unknown> | undefined {
   const root = asRecord(payload);
   const choices = root?.["choices"];
   if (!Array.isArray(choices)) {
     return undefined;
   }
   const first = asRecord((choices as unknown[])[0]);
-  const message = asRecord(first?.["message"]);
-  const content = message?.["content"];
-  return typeof content === "string" ? content : undefined;
+  return asRecord(first?.["message"]);
+}
+
+function hasReasoning(message: Record<string, unknown>): boolean {
+  const reasoning = message["reasoning"];
+  return typeof reasoning === "string" && reasoning.trim().length > 0;
 }
 
 async function buildErrorMessage(response: Response): Promise<string> {
