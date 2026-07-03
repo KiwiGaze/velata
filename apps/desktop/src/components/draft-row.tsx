@@ -165,7 +165,7 @@ export function DraftRow({
           onDelete(draft.id);
         }}
         aria-label="Delete draft"
-        className="text-ink-3 hover:bg-raise-2 hover:text-ink absolute right-1.5 top-1.5 rounded-[6px] p-1 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+        className="text-ink-3 hover:bg-raise-2 hover:text-ink absolute right-1.5 top-1.5 rounded-[6px] p-1 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
       >
         <Trash2 aria-hidden className="size-3.5" />
       </button>

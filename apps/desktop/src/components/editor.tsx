@@ -459,25 +459,31 @@ export function Editor({
   return (
     <div className="relative min-h-0 flex-1">
       <div
-        ref={editorRef}
-        role="textbox"
-        aria-label="Scratch pad"
-        aria-multiline="true"
-        contentEditable={!readOnly}
-        suppressContentEditableWarning
-        tabIndex={0}
-        onCompositionStart={() => {
-          composingRef.current = true;
-        }}
-        onCompositionEnd={handleCompositionEnd}
-        onInput={handleInput}
-        onKeyDown={handleKeyDown}
-        className={cn(
-          "caret-ink focus-visible:ring-0 h-full cursor-default overflow-y-auto px-10 pb-4 pt-[26px] text-[18px] leading-[1.72] tracking-[-0.003em] whitespace-pre-wrap outline-none",
-          dimmed ? "text-ink-2" : "text-ink",
-        )}
+        data-editor-scroll
+        className="h-full cursor-default overflow-y-auto px-10 pb-4 pt-[26px]"
       >
-        <div key={value}>{formatted.lines.map(renderLine)}</div>
+        <div
+          ref={editorRef}
+          data-editor-content-root
+          role="textbox"
+          aria-label="Scratch pad"
+          aria-multiline="true"
+          contentEditable={!readOnly}
+          suppressContentEditableWarning
+          tabIndex={0}
+          onCompositionStart={() => {
+            composingRef.current = true;
+          }}
+          onCompositionEnd={handleCompositionEnd}
+          onInput={handleInput}
+          onKeyDown={handleKeyDown}
+          className={cn(
+            "caret-ink focus-visible:ring-0 min-h-full cursor-text text-[18px] leading-[1.72] tracking-[-0.003em] whitespace-pre-wrap outline-none",
+            dimmed ? "text-ink-2" : "text-ink",
+          )}
+        >
+          <div key={value}>{formatted.lines.map(renderLine)}</div>
+        </div>
       </div>
       {overlay}
       {toolbar}
