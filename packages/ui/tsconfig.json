@@ -1,0 +1,12 @@
+{
+  "extends": "@velata/config/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["react", "react-dom"],
+    "baseUrl": ".",
+    "paths": {
+      "@velata/ui/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}

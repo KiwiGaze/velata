@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <filter id="tile-shadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#191B20" flood-opacity=".16"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="#FCFCFD" stroke="#E0E2E7" stroke-width="6" filter="url(#tile-shadow)"/>
+  <path d="M310 330 512 690" stroke="#191B20" stroke-opacity=".45" stroke-width="96" stroke-linecap="round"/>
+  <path d="M714 330 512 690" stroke="#191B20" stroke-width="96" stroke-linecap="round"/>
+</svg>

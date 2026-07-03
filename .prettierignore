@@ -1,0 +1,11 @@
+**/dist/**
+**/node_modules/**
+**/.turbo/**
+apps/desktop/src-tauri/target/**
+apps/desktop/src-tauri/gen/**
+pnpm-lock.yaml
+
+# Authoritative, human-owned docs — never reformat
+**/*.md
+docs/**
+design/**

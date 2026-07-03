@@ -1,0 +1,40 @@
+import { Switch } from "@velata/ui";
+import { type ReactElement } from "react";
+
+import { useSettings } from "@/hooks/use-settings";
+
+import { PaneHeader, SettingsRow } from "./primitives";
+
+export function DraftsPane(): ReactElement {
+  const { settings, updateSettings } = useSettings();
+
+  return (
+    <section>
+      <PaneHeader title="Drafts" subtitle="How the draft list behaves." />
+      <SettingsRow
+        label="Reuse empty draft on open"
+        description="Don't create a new blank draft if the current one is still empty."
+      >
+        <Switch
+          checked={settings.reuseEmptyDraft}
+          onCheckedChange={(next) => {
+            void updateSettings({ reuseEmptyDraft: next });
+          }}
+          aria-label="Reuse empty draft on open"
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Keep draft history"
+        description="Drafts stay in the list after sending, so nothing is lost."
+      >
+        <Switch
+          checked={settings.keepDraftHistory}
+          onCheckedChange={(next) => {
+            void updateSettings({ keepDraftHistory: next });
+          }}
+          aria-label="Keep draft history"
+        />
+      </SettingsRow>
+    </section>
+  );
+}

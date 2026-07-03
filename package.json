@@ -1,0 +1,29 @@
+{
+  "name": "velata",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "author": "Velata",
+  "type": "module",
+  "packageManager": "pnpm@10.9.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter velata-desktop tauri dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "turbo run test",
+    "tauri": "pnpm --filter velata-desktop tauri"
+  },
+  "devDependencies": {
+    "@velata/config": "workspace:*",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.8.3"
+  }
+}

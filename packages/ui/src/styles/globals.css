@@ -1,0 +1,150 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@source "../";
+
+/* Clean-sheet tokens — source of truth: design/tokens.md */
+:root {
+  --paper: #fcfcfd;
+  --raise: #f2f3f6;
+  --raise-2: #eaecf0;
+  --ink: #191b20;
+  --ink-2: #646a75;
+  --ink-3: #a4a9b3;
+  --line: #ebecf0;
+  --line-2: #e0e2e7;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--paper);
+  --secondary: var(--raise);
+  --secondary-foreground: var(--ink);
+  --muted: var(--raise);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--raise-2);
+  --accent-foreground: var(--ink);
+  --destructive: #b3261e;
+  --destructive-foreground: var(--paper);
+  --border: var(--line-2);
+  --input: var(--line-2);
+  --ring: rgb(25 27 32 / 0.18);
+
+  --radius: 0.9rem;
+
+  --sidebar: var(--paper);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--ink);
+  --sidebar-primary-foreground: var(--paper);
+  --sidebar-accent: var(--raise-2);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--line);
+  --sidebar-ring: rgb(25 27 32 / 0.18);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-paper: var(--paper);
+  --color-raise: var(--raise);
+  --color-raise-2: var(--raise-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans:
+    "Geist Variable", "PingFang SC", "Hiragino Sans GB", -apple-system, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "SF Mono", ui-monospace, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@keyframes progress-slide {
+  0% {
+    left: 0;
+    width: 0;
+  }
+  55% {
+    left: 0;
+    width: 75%;
+  }
+  100% {
+    left: 100%;
+    width: 0;
+  }
+}
+
+@theme {
+  --animate-progress-slide: progress-slide 2.1s ease-in-out infinite;
+  --shadow-sheet:
+    0 1px 0 #fff inset, 0 32px 72px -28px rgb(0 0 0 / 0.4), 0 10px 28px -14px rgb(0 0 0 / 0.3);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body {
+    @apply text-foreground font-sans antialiased;
+    background: transparent;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

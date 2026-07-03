@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a problem with Velata
+labels: ["bug"]
+body:
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: e.g. macOS 15.5
+    validations:
+      required: true
+  - type: input
+    id: velata-version
+    attributes:
+      label: Velata version
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Press ⌘⇧Space in another app
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, the provider/endpoint in use, or anything else relevant. Never include your API key.
+    validations:
+      required: false

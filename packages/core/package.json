@@ -1,0 +1,19 @@
+{
+  "name": "@velata/core",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@velata/config": "workspace:*",
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.8"
+  }
+}

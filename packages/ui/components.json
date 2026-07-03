@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@velata/ui/components",
+    "ui": "@velata/ui/components/ui",
+    "utils": "@velata/ui/lib/utils",
+    "lib": "@velata/ui/lib",
+    "hooks": "@velata/ui/hooks"
+  }
+}
