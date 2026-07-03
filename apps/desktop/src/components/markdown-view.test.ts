@@ -19,4 +19,21 @@ describe("MarkdownView", () => {
     expect(html).toContain('data-editor-mark="bold"');
     expect(html).toContain("•");
   });
+
+  it("renders numbered, check, code, link, and empty lines", () => {
+    const html = renderToStaticMarkup(
+      createElement(MarkdownView, {
+        document: parseFormattedMarkdown(
+          "1. step with `code`\n- [ ] open\n- [x] done\n[label](https://example.com)\n",
+        ),
+      }),
+    );
+    expect(html).toContain(">1.</span>");
+    expect(html).toContain("□");
+    expect(html).toContain("☑");
+    expect(html).toContain('data-editor-mark="code"');
+    expect(html).toContain('data-editor-mark="link"');
+    expect(html).toContain('data-editor-url="https://example.com"');
+    expect(html).toContain("<br/>");
+  });
 });

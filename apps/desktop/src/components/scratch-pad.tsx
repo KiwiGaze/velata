@@ -97,6 +97,7 @@ export function ScratchPad(): ReactElement {
   const [splitMode, setSplitMode] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("clean");
   const preSplitWidthRef = useRef<number | null>(null);
+  const splitSizeSessionRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const editorRef = useRef<EditorHandle | null>(null);
 
@@ -299,7 +300,7 @@ export function ScratchPad(): ReactElement {
     focusEditor();
   }
 
-  async function enterSplitSize(): Promise<void> {
+  async function enterSplitSize(session: number): Promise<void> {
     const appWindow = getCurrentWindow();
     const [scaleFactor, position, size, monitor] = await Promise.all([
       appWindow.scaleFactor(),
@@ -307,12 +308,15 @@ export function ScratchPad(): ReactElement {
       appWindow.outerSize(),
       currentMonitor(),
     ]);
+    if (session !== splitSizeSessionRef.current) {
+      return;
+    }
     const logicalPosition = position.toLogical(scaleFactor);
     const logicalSize = size.toLogical(scaleFactor);
-    preSplitWidthRef.current = logicalSize.width;
+    preSplitWidthRef.current ??= logicalSize.width;
     const width = Math.max(SPLIT_MIN_WIDTH, logicalSize.width);
     await appWindow.setSize(new LogicalSize(width, logicalSize.height));
-    if (monitor === null) {
+    if (session !== splitSizeSessionRef.current || monitor === null) {
       return;
     }
     const monitorPosition = monitor.position.toLogical(monitor.scaleFactor);
@@ -324,28 +328,33 @@ export function ScratchPad(): ReactElement {
     }
   }
 
-  async function leaveSplitSize(): Promise<void> {
+  async function leaveSplitSize(session: number): Promise<void> {
     const width = preSplitWidthRef.current;
     if (width === null) {
       return;
     }
-    preSplitWidthRef.current = null;
     const appWindow = getCurrentWindow();
     const [scaleFactor, size] = await Promise.all([appWindow.scaleFactor(), appWindow.outerSize()]);
+    if (session !== splitSizeSessionRef.current) {
+      return;
+    }
+    preSplitWidthRef.current = null;
     const logicalSize = size.toLogical(scaleFactor);
     await appWindow.setSize(new LogicalSize(width, logicalSize.height));
   }
 
   function handleToggleSplit(): void {
+    splitSizeSessionRef.current += 1;
+    const session = splitSizeSessionRef.current;
     if (splitMode) {
       setSplitMode(false);
-      void leaveSplitSize();
+      void leaveSplitSize(session).catch(() => undefined);
       return;
     }
     resetTransient();
     setRailOpen(false);
     setSplitMode(true);
-    void enterSplitSize();
+    void enterSplitSize(session).catch(() => undefined);
   }
 
   function handleCopyClose(): void {
