@@ -95,8 +95,13 @@ describe("matchDraft", () => {
     const match = matchDraft(text, "模型");
     expect(match).not.toBeNull();
     expect(match?.titleRanges).toEqual([{ start: 3, end: 5 }]);
-    expect(match?.snippet?.text).toBe(text);
-    expect(match?.snippet?.ranges).toEqual([{ start: 3, end: 5 }]);
+    expect(match?.snippet).toBeNull();
+  });
+
+  it("suppresses the snippet when it would just repeat the title", () => {
+    const match = matchDraft("Buy milk", "milk");
+    expect(match?.titleRanges).toEqual([{ start: 4, end: 8 }]);
+    expect(match?.snippet).toBeNull();
   });
 
   it("returns an empty title range but a snippet when the match is only in the body", () => {

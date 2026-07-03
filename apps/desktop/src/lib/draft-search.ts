@@ -67,7 +67,8 @@ export function matchDraft(text: string, query: string): DraftMatch | null {
     return null;
   }
 
-  const titleRanges = findMatchRanges(firstNonEmptyLine(text) ?? "", trimmedQuery);
+  const title = firstNonEmptyLine(text) ?? "";
+  const titleRanges = findMatchRanges(title, trimmedQuery);
 
   const windowStart = Math.max(0, firstIndex - SNIPPET_CONTEXT_BEFORE);
   const windowEnd = Math.min(text.length, windowStart + SNIPPET_LENGTH);
@@ -79,10 +80,13 @@ export function matchDraft(text: string, query: string): DraftMatch | null {
     snippetText = `${snippetText}…`;
   }
 
-  return {
-    titleRanges,
-    snippet: { text: snippetText, ranges: findMatchRanges(snippetText, trimmedQuery) },
-  };
+  // A snippet identical to the title would render the same line twice in DraftRow.
+  const snippet =
+    snippetText === title
+      ? null
+      : { text: snippetText, ranges: findMatchRanges(snippetText, trimmedQuery) };
+
+  return { titleRanges, snippet };
 }
 
 /** Filter and annotate drafts by `query`; an empty query yields every draft with a `null` match. */

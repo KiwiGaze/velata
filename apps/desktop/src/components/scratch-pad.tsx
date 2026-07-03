@@ -378,9 +378,11 @@ export function ScratchPad(): ReactElement {
                   />
                 ) : undefined
               }
-              {...(formattingOpen && phase.kind !== "refining"
-                ? { toolbar: <FormattingToolbar onApply={handleApplyFormat} /> }
-                : {})}
+              toolbar={
+                formattingOpen && phase.kind !== "refining" && phase.kind !== "refined" ? (
+                  <FormattingToolbar onApply={handleApplyFormat} />
+                ) : undefined
+              }
             />
 
             <div className="text-ink-3 flex min-h-[16px] flex-wrap gap-x-[14px] gap-y-1 px-10 pb-3.5 font-mono text-[11px]">
