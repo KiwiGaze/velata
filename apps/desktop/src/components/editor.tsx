@@ -318,7 +318,7 @@ function renderLine(line: MarkdownLine, index: number): ReactNode {
       data-editor-line="true"
       data-source-marker={line.marker}
       className={cn(
-        "min-h-[1.72em]",
+        "min-h-[1.72em] cursor-text",
         line.kind === "quote" && "border-line-2 border-l pl-4",
         line.kind !== "plain" && line.kind !== "quote" && "flex gap-3",
       )}
@@ -432,7 +432,7 @@ export function Editor({
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         className={cn(
-          "caret-ink focus-visible:ring-0 h-full overflow-y-auto px-10 pb-4 pt-[26px] text-[18px] leading-[1.72] tracking-[-0.003em] whitespace-pre-wrap outline-none",
+          "caret-ink focus-visible:ring-0 h-full cursor-default overflow-y-auto px-10 pb-4 pt-[26px] text-[18px] leading-[1.72] tracking-[-0.003em] whitespace-pre-wrap outline-none",
           dimmed ? "text-ink-2" : "text-ink",
         )}
       >

@@ -59,8 +59,8 @@ export function DraftsRail({
   return (
     <aside
       className={cn(
-        "border-line flex w-[52px] flex-none flex-col overflow-hidden border-r transition-[width] duration-200 ease-out",
-        open && "w-[228px]",
+        "border-line flex w-[52px] min-w-[52px] flex-none flex-col overflow-hidden border-r transition-[width] duration-200 ease-out",
+        open && "w-[clamp(180px,36%,228px)]",
       )}
     >
       <TooltipProvider>
@@ -79,7 +79,7 @@ export function DraftsRail({
           inert={!open}
           aria-hidden={!open}
           className={cn(
-            "flex min-h-0 w-[228px] flex-1 flex-col px-2 pb-3 transition-opacity duration-150",
+            "flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-x-hidden px-2 pb-3 transition-opacity duration-150",
             open ? "opacity-100" : "opacity-0",
           )}
         >
@@ -127,8 +127,8 @@ export function DraftsRail({
               </button>
             )}
           </div>
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="flex flex-col gap-px">
+          <ScrollArea className="min-h-0 min-w-0 flex-1 overflow-x-hidden [&_[data-slot=scroll-area-viewport]]:overflow-x-hidden">
+            <div className="flex min-w-0 flex-col gap-px overflow-x-hidden">
               {noMatches ? (
                 <div className="text-ink-3 px-2.5 py-4 text-center text-[12px]">
                   No matching drafts
