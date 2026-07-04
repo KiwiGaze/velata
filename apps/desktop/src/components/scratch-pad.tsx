@@ -159,6 +159,7 @@ export function ScratchPad(): ReactElement {
   function handleSelectDraft(id: string): void {
     resetTransient();
     selectDraft(id);
+    focusEditor();
   }
 
   function handleDeleteDraft(id: string): void {
