@@ -21,6 +21,7 @@ describe("Editor", () => {
     const html = renderToStaticMarkup(
       createElement(Editor, {
         ref: createRef<EditorHandle>(),
+        docId: "test-draft",
         value: "First\n\nSecond",
         onChange: vi.fn(),
         dimmed: false,

@@ -525,6 +525,7 @@ export function ScratchPad(): ReactElement {
           <div className="flex min-h-0 flex-1">
             <Editor
               ref={editorRef}
+              docId={activeId}
               value={activeText}
               onChange={handleTextChange}
               dimmed={refining}
