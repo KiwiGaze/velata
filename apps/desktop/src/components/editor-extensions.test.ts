@@ -45,3 +45,54 @@ describe("velata markdown round-trip", () => {
     editor.destroy();
   });
 });
+
+describe("velata markdown round-trip preserves structure", () => {
+  it("keeps the heading marker and text", () => {
+    const out = roundTrip("# Heading one");
+    expect(out).toMatch(/^# /);
+    expect(out).toContain("Heading one");
+  });
+
+  it("keeps the link target and label", () => {
+    const out = roundTrip("[label](https://example.com)");
+    expect(out).toContain("](https://example.com)");
+    expect(out).toContain("label");
+  });
+
+  it("keeps both bullet items under a bullet marker", () => {
+    const out = roundTrip("- first\n- second");
+    expect(out).toContain("first");
+    expect(out).toContain("second");
+    expect(out).toMatch(/^[-*] /m);
+  });
+
+  it("keeps both ordered items under a numbered marker", () => {
+    const out = roundTrip("1. one\n2. two");
+    expect(out).toContain("one");
+    expect(out).toContain("two");
+    expect(out).toMatch(/^\d+[.)] /m);
+  });
+
+  it("keeps the blockquote marker and text", () => {
+    const out = roundTrip("> quoted line");
+    expect(out).toMatch(/^>/);
+    expect(out).toContain("quoted line");
+  });
+
+  it("keeps inline code wrapped in backticks", () => {
+    expect(roundTrip("`code`")).toContain("`code`");
+  });
+
+  it("keeps fenced code content inside a fence", () => {
+    const out = roundTrip("```js\nconst x = 1;\n```");
+    expect(out).toContain("const x = 1;");
+    expect(out).toContain("```");
+  });
+
+  it.each([
+    ["**bold**", "bold"],
+    ["*italic*", "italic"],
+  ])("keeps the emphasized word from %j", (input, word) => {
+    expect(roundTrip(input)).toContain(word);
+  });
+});
