@@ -152,24 +152,25 @@ be verified on a real GUI session.
 1. Open the drafts rail, then click the pinned **Formatting** row → it takes the pressed styling and
    a monochrome floating toolbar appears bottom-center over the editor. Hover any button → a tooltip
    names it. Confirm zero color anywhere (ink on paper, hairline border, neutral drop shadow).
-2. **Bold:** select a word → click **Bold** → the word renders bold in the editor and in its draft
-   row title; the raw `**word**` markers are not visible. Click **Bold** again → it unwraps back to
-   plain text.
-3. **Italic over bold:** select a bold word → click **Italic** → it renders bold + italic without
-   showing `***` markers.
-4. **Code:** select text → click **Code** → it renders as inline code; clicking again unwraps.
-5. **Bulleted list:** put the caret on a line → click **Bulleted list** → the line renders with a
-   bullet marker, not a raw `-` prefix; click again → the bullet is removed.
-6. **Numbered list:** select several lines → click **Numbered list** → they render as numbered
-   rows; click again → the numbers are stripped from the stored source.
-7. **Checklist:** with the caret on a line → click **Checklist** → the line renders with a checkbox.
-8. **Quote:** with the caret on a line → click **Quote** → the line renders as a quote, without a raw
-   `>` prefix.
+2. **Bold:** select a word → click **Bold** → the source becomes `**word**`; the markers remain
+   visible and recede, and the word is heavier. In the draft row / rendered preview, the raw markers
+   are not visible. Click **Bold** again → it unwraps back to plain text.
+3. **Italic over bold:** select a bold word → click **Italic** → the source becomes `***word***`;
+   markers remain visible in the editor and the word is bold + italic.
+4. **Code:** select text → click **Code** → the source wraps it in backticks and the text uses the
+   mono style; clicking again unwraps.
+5. **Bulleted list:** put the caret on a line → click **Bulleted list** → the source line starts with
+   `- `; click again → the prefix is removed.
+6. **Numbered list:** select several lines → click **Numbered list** → the source lines get numeric
+   prefixes; click again → the numbers are stripped from the stored source.
+7. **Checklist:** with the caret on a line → click **Checklist** → the source line starts with
+   `- [ ] `.
+8. **Quote:** with the caret on a line → click **Quote** → the source line starts with `> `.
 9. **Empty-line no-op:** put the caret on a blank line → click any list or quote button → the text is
    unchanged (in particular, no preceding newline is deleted).
-10. **Link:** select `foo` → click **Link** → `foo` renders as a link-styled label while refine/copy
-    still use the Markdown source. With nothing selected → click **Link** → inserts a rendered
-    `text` placeholder with the text selected.
+10. **Link:** select `foo` → click **Link** → the source becomes `[foo](https://example.com)` while
+    the rendered preview / draft row show a link-styled label. With nothing selected → click
+    **Link** → inserts `[text](https://example.com)` with `text` selected.
 11. **Empty selection Bold:** click into an empty spot (no selection) → click **Bold** → inserts
     an empty bold span with the caret centered inside it, ready to type.
 12. **Undo:** apply any toolbar format → press **⌘Z** → the formatting edit is undone.

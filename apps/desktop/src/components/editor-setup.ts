@@ -15,6 +15,15 @@ const velataHighlightStyle = HighlightStyle.define([
   { tag: tags.emphasis, fontStyle: "italic" },
   { tag: tags.strikethrough, textDecoration: "line-through" },
   { tag: tags.link, textDecoration: "underline", textUnderlineOffset: "3px" },
+  { tag: tags.keyword, fontWeight: "600" },
+  { tag: tags.atom, fontWeight: "600" },
+  { tag: tags.bool, fontWeight: "600" },
+  { tag: tags.number, fontVariantNumeric: "tabular-nums" },
+  { tag: tags.string, color: "var(--ink-2)" },
+  { tag: tags.comment, color: "var(--ink-3)", fontStyle: "italic" },
+  { tag: tags.operator, color: "var(--ink-3)" },
+  { tag: tags.variableName, color: "var(--ink)" },
+  { tag: tags.definition(tags.variableName), fontWeight: "600" },
   { tag: tags.url, color: "var(--ink-3)" },
   { tag: tags.monospace, fontFamily: MONO_STACK, fontSize: "0.92em" },
   { tag: tags.processingInstruction, color: "var(--ink-3)" },
@@ -54,7 +63,7 @@ const velataTheme = EditorView.theme(
   { dark: false },
 );
 
-const APP_OWNED_CODEMIRROR_KEYS = new Set(["Mod-Enter"]);
+const APP_OWNED_CODEMIRROR_KEYS = new Set(["Escape", "Mod-Enter"]);
 
 export const velataEditorKeymap: readonly KeyBinding[] = [
   ...historyKeymap,
@@ -67,6 +76,11 @@ export const velataEditorExtensions: Extension = [
   history(),
   drawSelection(),
   EditorView.lineWrapping,
+  EditorView.contentAttributes.of({
+    "aria-label": "Scratch pad",
+    "aria-multiline": "true",
+    role: "textbox",
+  }),
   syntaxHighlighting(velataHighlightStyle),
   velataTheme,
   search({ top: true }),
