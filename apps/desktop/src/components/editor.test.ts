@@ -17,7 +17,7 @@ function indexForMarker(html: string, marker: string): number {
 }
 
 describe("Editor", () => {
-  it("keeps the editable region inside the padded scroll container", () => {
+  it("keeps the editable region inside the padded scroll container without a focus ring", () => {
     const html = renderToStaticMarkup(
       createElement(Editor, {
         ref: createRef<EditorHandle>(),
@@ -37,9 +37,9 @@ describe("Editor", () => {
       expect.arrayContaining(["overflow-y-auto", "px-10", "pb-4", "pt-[26px]"]),
     );
     expect(contentRootClasses).not.toEqual(expect.arrayContaining(["px-10", "pb-4"]));
-    expect(contentRootClasses).toEqual(
+    expect(contentRootClasses).not.toEqual(
       expect.arrayContaining(["focus-visible:ring-2", "focus-visible:ring-ring"]),
     );
-    expect(contentRootClasses).not.toContain("focus-visible:ring-0");
+    expect(contentRootClasses).toContain("focus-visible:ring-0");
   });
 });
