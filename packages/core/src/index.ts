@@ -10,6 +10,9 @@ export {
   DEFAULT_INSTRUCTION,
   DEFAULT_REFINE_PROMPT,
   type Instruction,
+  normalizeStructureOutput,
+  STRUCTURE_INSTRUCTION,
+  STRUCTURE_REFINE_PROMPT,
   type TargetLanguage,
 } from "./instruction";
 export { buildSystemPrompt } from "./prompt";

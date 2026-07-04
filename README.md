@@ -39,7 +39,7 @@ Drafts persist between summons, so nothing is lost when the window hides. Velata
 
 ## Data modes
 
-Today Velata runs in local mode. Drafts and settings stay on your Mac, refine calls go directly from the app to the OpenAI-compatible `/chat/completions` endpoint you configure in Settings, and your API key is stored in the macOS Keychain. Use OpenAI, GLM, Kimi, Cerebras, a local OpenAI-compatible server, or anything with that shape.
+Today Velata runs in local mode. Drafts and settings stay on your Mac, refine calls go directly from the app to the OpenAI-compatible `/chat/completions` endpoint you configure in Settings, and your API key is stored in the macOS Keychain. Use OpenAI, GLM, Kimi, Cerebras, a local OpenAI-compatible server, or anything with that shape. While Split Preview is on, your draft is sent to your configured endpoint automatically as you type.
 
 Velata Cloud sync is planned as a future opt-in mode for people who want their scratchpad available across devices. It is not implemented in this release: there are no Velata accounts, cloud draft storage, or cloud sync paths today.
 

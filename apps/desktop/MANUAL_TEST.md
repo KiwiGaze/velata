@@ -204,3 +204,23 @@ be verified on a real GUI session.
 9. **Language preserved:** run a transform on non-English text → the output stays in the input's language
    (transforms rewrite, they do not translate).
 10. Click the **Transforms** row again → the bar hides.
+
+## 12. Split Preview
+
+Setup: a connected model in Settings; a multi-sentence messy draft in the scratchpad.
+
+- [ ] Click `Split` in the header: the window widens (≥ ~1000 pt) keeping its height, stays fully on screen even when it was hugging the right display edge, and the drafts rail collapses if it was open.
+- [ ] Pause typing ~1.5s: the right pane shows `refreshing…`, then the refined text with status `live`.
+- [ ] Type again, pause again: the previous preview stays visible until replaced — no blank flash.
+- [ ] Switch `Clean` ↔ `Structure` (click and arrow keys): an immediate re-refine runs; Structure output uses bold titles, bullets, and numbered steps — never a literal `#`.
+- [ ] Change the target language while split is on: the preview re-refines immediately in the new language.
+- [ ] `⌘K` forces an immediate refresh; the left text never changes in place and no diff overlay appears.
+- [ ] `⌘↵` with a `live` preview: the clipboard holds the refined preview text and the window hides.
+- [ ] Switch drafts and press `⌘↵` within a second: the clipboard holds the new draft's raw text — never the previous draft's preview.
+- [ ] Select-all + delete on the left: the preview clears to its placeholder immediately.
+- [ ] Blank → retype the exact same text → pause: the preview refreshes again (no permanently empty pane).
+- [ ] `⌘P` does nothing while split is on; after leaving split it opens the palette again.
+- [ ] Point Settings at an unreachable endpoint, edit, pause: a one-line error appears inside the preview only; the left editor still works and `⌘↵` copies the raw text; `⌘K` retries.
+- [ ] Drag-resize narrower: the window refuses to shrink below the split minimum while split is on, and allows 560 again after leaving split.
+- [ ] Click `Split` again: the window restores the exact pre-split width; `⌘K` refines in place with the diff overlay (classic mode unchanged).
+- [ ] Toggle Split on while a classic refine is running: the refine cancels and the overlay dismisses.
