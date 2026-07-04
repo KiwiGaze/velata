@@ -89,11 +89,6 @@ export function ScratchPad(): ReactElement {
     pickTransforms(TRANSFORM_PRESETS, TRANSFORM_COUNT, []),
   );
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [formatUndo, setFormatUndo] = useState<{
-    text: string;
-    selectionStart: number;
-    selectionEnd: number;
-  } | null>(null);
   const [splitMode, setSplitMode] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("clean");
   const preSplitWidthRef = useRef<number | null>(null);
@@ -143,7 +138,6 @@ export function ScratchPad(): ReactElement {
   const resetTransient = useCallback((): void => {
     abortRef.current?.abort();
     abortRef.current = null;
-    setFormatUndo(null);
     setPhase({ kind: "idle" });
   }, []);
 
@@ -186,7 +180,6 @@ export function ScratchPad(): ReactElement {
   }
 
   function handleTextChange(next: string): void {
-    setFormatUndo(null);
     updateActiveText(next);
     if (phase.kind === "refined" || phase.kind === "error") {
       setPhase({ kind: "idle" });
@@ -201,11 +194,6 @@ export function ScratchPad(): ReactElement {
     const selection = editor.getSelectionRange();
     const plan = planFormat(activeText, selection.start, selection.end, action);
     const next = `${activeText.slice(0, plan.replaceStart)}${plan.insert}${activeText.slice(plan.replaceEnd)}`;
-    setFormatUndo({
-      text: activeText,
-      selectionStart: selection.start,
-      selectionEnd: selection.end,
-    });
     updateActiveText(next);
     if (phase.kind === "refined" || phase.kind === "error") {
       setPhase({ kind: "idle" });
@@ -274,25 +262,6 @@ export function ScratchPad(): ReactElement {
         }
       }
     })();
-  }
-
-  function handleUndo(): void {
-    if (phase.kind === "refined") {
-      updateActiveText(phase.previous);
-      setPhase({ kind: "idle" });
-      focusEditor();
-      return;
-    }
-    if (formatUndo === null) {
-      return;
-    }
-    updateActiveText(formatUndo.text);
-    const { selectionStart, selectionEnd } = formatUndo;
-    setFormatUndo(null);
-    requestAnimationFrame(() => {
-      editorRef.current?.focus();
-      editorRef.current?.setSelectionRange(selectionStart, selectionEnd);
-    });
   }
 
   function handleDismissDiff(): void {
@@ -431,7 +400,6 @@ export function ScratchPad(): ReactElement {
     onCopyClose: handleCopyClose,
     onCutClose: handleCutClose,
     onDismiss: handleDismiss,
-    onUndo: handleUndo,
     onDeleteActive: handleDeleteActive,
     onSelectIndex: handleSelectIndex,
     onOpenPalette: () => {
@@ -442,7 +410,6 @@ export function ScratchPad(): ReactElement {
     onOpenSettings: () => {
       void invoke("open_settings");
     },
-    canUndo: phase.kind === "refined" || formatUndo !== null,
     draftCount: drafts.length,
     paletteOpen,
   });
