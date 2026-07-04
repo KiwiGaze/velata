@@ -48,5 +48,4 @@ describe("parseFormattedMarkdown", () => {
     ]);
     expect(document.lines.map((line) => line.marker)).toEqual(["- ", "1. ", "- [ ] ", "> "]);
   });
-
 });
