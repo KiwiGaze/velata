@@ -252,9 +252,9 @@ Run `pnpm dev`, summon the ScratchPad (`⌘⇧Space`).
 - [ ] Switch drafts, type, `⌘Z` — undo does not cross into the previous draft.
 
 ### 13.5 Selection refine + shortcuts
-- [ ] Select part of the text, `⌘K` — only the selection is refined and replaced in place.
+- [ ] Select part of the text, `⌘K` — only the selection is refined and replaced in place. The selection is sent as plain text: inline formatting inside it (e.g. a **bold** word) is not preserved through refine — expected.
 - [ ] `⌘↵` while the editor is focused → Copy & Close (clipboard gets the text, the panel hides); it does **not** insert a line break. `⌘⇧↵` → Cut & Close likewise. (Regression guard: HardBreak's `⌘↵` binding is disabled.)
-- [ ] Edge: with the caret **inside a fenced code block**, `⌘↵` exits the code block instead of Copy & Close (base ProseMirror keymap) — move the caret out of the block first.
+- [ ] With the caret **inside a fenced code block**, `⌘↵` Copy & Close and `⌘⇧↵` Cut & Close still work — the editor must not exit the block or swallow the key. (To exit a code block, press `Enter` three times.)
 - [ ] After a `⌘1`–`⌘9` draft switch the editor stays focused (type immediately, no click needed).
 - [ ] `⌘W` delete draft, `⌘P` palette, `⌘,` settings, `esc` dismiss — all still work.
 - [ ] `⌘B` / `⌘I` toggle bold / italic (bonus from Tiptap); they do not trigger any window shortcut.

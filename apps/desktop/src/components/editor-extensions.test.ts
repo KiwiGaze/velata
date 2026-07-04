@@ -104,3 +104,58 @@ describe("velata extension set", () => {
     editor.destroy();
   });
 });
+
+describe("copy & close passthrough", () => {
+  function mountEditor(markdown: string): Editor {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    return new Editor({
+      element: host,
+      extensions: velataExtensions,
+      content: markdown,
+      contentType: "markdown",
+    });
+  }
+
+  function dispatchKeydown(editor: Editor, init: KeyboardEventInit): KeyboardEvent {
+    const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
+    editor.view.dom.dispatchEvent(event);
+    return event;
+  }
+
+  it("leaves ⌘↵ unhandled inside a fenced code block", () => {
+    const editor = mountEditor("```js\nconst x = 1;\n```");
+    editor.commands.setTextSelection(3);
+    const before = editor.getMarkdown();
+    const event = dispatchKeydown(editor, { key: "Enter", metaKey: true });
+    expect(event.defaultPrevented).toBe(false);
+    expect(editor.getMarkdown()).toBe(before);
+    editor.destroy();
+  });
+
+  it("leaves ⌘⇧↵ unhandled inside a fenced code block", () => {
+    const editor = mountEditor("```js\nconst x = 1;\n```");
+    editor.commands.setTextSelection(3);
+    const event = dispatchKeydown(editor, { key: "Enter", metaKey: true, shiftKey: true });
+    expect(event.defaultPrevented).toBe(false);
+    editor.destroy();
+  });
+
+  it("leaves Ctrl-Enter (Mod-Enter off macOS) unhandled inside a fenced code block", () => {
+    const editor = mountEditor("```js\nconst x = 1;\n```");
+    editor.commands.setTextSelection(3);
+    const before = editor.getMarkdown();
+    const event = dispatchKeydown(editor, { key: "Enter", ctrlKey: true });
+    expect(event.defaultPrevented).toBe(false);
+    expect(editor.getMarkdown()).toBe(before);
+    editor.destroy();
+  });
+
+  it("still lets the editor handle plain Enter", () => {
+    const editor = mountEditor("plain text");
+    editor.commands.setTextSelection(3);
+    const event = dispatchKeydown(editor, { key: "Enter" });
+    expect(event.defaultPrevented).toBe(true);
+    editor.destroy();
+  });
+});
