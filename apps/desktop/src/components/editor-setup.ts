@@ -4,7 +4,7 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { search, searchKeymap } from "@codemirror/search";
 import { type Extension } from "@codemirror/state";
-import { drawSelection, EditorView, keymap } from "@codemirror/view";
+import { drawSelection, EditorView, type KeyBinding, keymap } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 
 const MONO_STACK = "var(--font-mono, ui-monospace, SFMono-Regular, 'SF Mono', monospace)";
@@ -54,6 +54,14 @@ const velataTheme = EditorView.theme(
   { dark: false },
 );
 
+const APP_OWNED_CODEMIRROR_KEYS = new Set(["Mod-Enter"]);
+
+export const velataEditorKeymap: readonly KeyBinding[] = [
+  ...historyKeymap,
+  ...searchKeymap,
+  ...defaultKeymap.filter((binding) => !APP_OWNED_CODEMIRROR_KEYS.has(binding.key ?? "")),
+];
+
 export const velataEditorExtensions: Extension = [
   markdown({ codeLanguages: languages }),
   history(),
@@ -62,5 +70,5 @@ export const velataEditorExtensions: Extension = [
   syntaxHighlighting(velataHighlightStyle),
   velataTheme,
   search({ top: true }),
-  keymap.of([...historyKeymap, ...searchKeymap, ...defaultKeymap]),
+  keymap.of(velataEditorKeymap),
 ];

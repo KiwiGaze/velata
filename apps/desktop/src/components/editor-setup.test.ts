@@ -1,7 +1,7 @@
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 
-import { velataEditorExtensions } from "./editor-setup";
+import { velataEditorExtensions, velataEditorKeymap } from "./editor-setup";
 
 describe("velataEditorExtensions", () => {
   it("builds a source-mode state whose document is the raw markdown", () => {
@@ -19,5 +19,9 @@ describe("velataEditorExtensions", () => {
 
     expect(next.selection.main.from).toBe(2);
     expect(next.selection.main.to).toBe(6);
+  });
+
+  it("does not bind app-owned copy close shortcut in CodeMirror", () => {
+    expect(velataEditorKeymap.some((binding) => binding.key === "Mod-Enter")).toBe(false);
   });
 });
