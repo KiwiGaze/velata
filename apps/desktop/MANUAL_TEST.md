@@ -243,6 +243,7 @@ Run `pnpm dev`, summon the ScratchPad (`⌘⇧Space`).
 - [ ] Type a doc using every toolbar format, `⌘↵` Copy & Close, paste elsewhere — the clipboard Markdown matches what you see.
 - [ ] Refine (`⌘K`), then compare — the refined text is clean Markdown (minor normalization like `*`→`_` is acceptable; no corruption or lost content).
 - [ ] Check-list (`- [ ] `) renders and toggles in the editor, but note it is **best-effort**: the task-list markdown is not in the guarded round-trip subset and may not survive reload/refine.
+- [ ] Hard breaks are out of scope: Enter starts a new paragraph and `⇧Enter` no longer inserts an in-paragraph line break, so a Markdown hard break (trailing `  ` / `\`) will not round-trip. Expected — the `⌘↵` fix disables HardBreak.
 
 ### 13.4 Undo / redo
 - [ ] Type several words, `⌘Z` repeatedly walks back; `⌘⇧Z` redoes.
