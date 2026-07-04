@@ -224,3 +224,39 @@ Setup: a connected model in Settings; a multi-sentence messy draft in the scratc
 - [ ] Drag-resize narrower: the window refuses to shrink below the split minimum while split is on, and allows 560 again after leaving split.
 - [ ] Click `Split` again: the window restores the exact pre-split width; `⌘K` refines in place with the diff overlay (classic mode unchanged).
 - [ ] Toggle Split on while a classic refine is running: the refine cancels and the overlay dismisses.
+
+## 13. CodeMirror 6 editor (source mode)
+
+Run `pnpm dev` and summon the ScratchPad (`⌘⇧Space`). Some checks require a connected
+model in Settings and an editable draft with enough text to refine; confirm that first so
+missing API/model config is not mistaken for a CM6 failure.
+
+### 13.1 Source rendering
+
+- [ ] Type `**bold** _italic_ ` `` `code` `` — the `**`/`_`/`` ` `` markers stay visible and recede (lighter ink); bold is heavier, italic is slanted, code is monospace.
+- [ ] A fenced code block ```` ```js ```` … ```` ``` ```` shows language syntax highlighting in monochrome (weight/style only, no color).
+- [ ] The editor has no focus ring; text keeps the 26px top / 40px side padding.
+
+### 13.2 IME / mixed-language input (core scenario)
+
+- [ ] With the macOS Pinyin IME, type a full sentence mixing 中文 and English and numbers — no dropped, duplicated, or reordered characters; the candidate window commits correctly.
+- [ ] Repeat with the Japanese IME (かな→漢字 conversion) inside a `**bold**` span — composition commits cleanly with no restart loop.
+- [ ] Paste dictated mixed-language text and edit in the middle — no crash on delete after a line break (the regression this migration retires).
+
+### 13.3 Undo / redo (multi-level)
+
+- [ ] Type several words, then press `⌘Z` repeatedly — each press walks back one edit group; `⌘⇧Z` redoes.
+- [ ] Apply a format from the toolbar, then `⌘Z` — the format is reverted.
+- [ ] Refine (`⌘K`), then `⌘Z` — the refine is undone and the before/after diff overlay disappears.
+- [ ] Switch drafts, type, then `⌘Z` — undo does not cross into the previous draft's history.
+
+### 13.4 Find & replace
+
+- [ ] `⌘F` opens the search panel; matches highlight in gray; Enter cycles matches.
+- [ ] Type `alpha beta alpha`, replace `alpha` with `gamma`, then Replace all — both matches change; `Esc` closes the panel and does **not** dismiss the window (window `Esc` still dismisses when the panel is closed).
+
+### 13.5 Existing shortcuts still work (no CM6 collision)
+
+- [ ] `⌘K` refine, `⌘↵` Copy & Close, `⌘⇧↵` Cut & Close, `⌘W` delete draft, `⌘1`–`⌘9` select draft, `⌘P` palette, `⌘,` settings — all behave as before.
+- [ ] Select a range, `⌘K` — only the selection is refined (selection-based refine).
+- [ ] Split mode: left pane is source, right pane is rendered Markdown; `⌘↵` copies the refined preview.
