@@ -1,0 +1,107 @@
+.velata-editor .ProseMirror {
+  min-height: 100%;
+  padding: 26px 40px 16px;
+  outline: none;
+  font-family: -apple-system, system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 1.72;
+  letter-spacing: -0.003em;
+  color: var(--cm-fg, var(--ink));
+  caret-color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.velata-editor .ProseMirror:focus,
+.velata-editor .ProseMirror:focus-visible {
+  outline: none;
+}
+.velata-editor .ProseMirror > * + * {
+  margin-top: 0.5em;
+}
+.velata-editor .ProseMirror p {
+  margin: 0;
+}
+.velata-editor .ProseMirror h1 {
+  font-size: 1.5em;
+  font-weight: 600;
+}
+.velata-editor .ProseMirror h2 {
+  font-size: 1.3em;
+  font-weight: 600;
+}
+.velata-editor .ProseMirror h3 {
+  font-size: 1.12em;
+  font-weight: 600;
+}
+.velata-editor .ProseMirror strong {
+  font-weight: 600;
+}
+.velata-editor .ProseMirror em {
+  font-style: italic;
+}
+.velata-editor .ProseMirror code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, "SF Mono", monospace);
+  font-size: 0.92em;
+  background: var(--raise);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+}
+.velata-editor .ProseMirror pre {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, "SF Mono", monospace);
+  font-size: 0.92em;
+  background: var(--raise);
+  border-radius: 8px;
+  padding: 12px 16px;
+  overflow-x: auto;
+}
+.velata-editor .ProseMirror pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+.velata-editor .ProseMirror blockquote {
+  border-left: 2px solid var(--line-2);
+  padding-left: 1em;
+  color: var(--ink-2);
+}
+.velata-editor .ProseMirror ul,
+.velata-editor .ProseMirror ol {
+  padding-left: 1.4em;
+}
+.velata-editor .ProseMirror a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.velata-editor .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0.2em;
+}
+.velata-editor .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+.velata-editor .ProseMirror ul[data-type="taskList"] li > label {
+  margin-top: 0.35em;
+}
+.velata-editor .ProseMirror ::selection {
+  background: var(--raise-2);
+}
+
+/* Monochrome code highlighting — differentiate by weight/style/recessed ink only, never hue. */
+.velata-editor .ProseMirror .hljs-keyword,
+.velata-editor .ProseMirror .hljs-built_in,
+.velata-editor .ProseMirror .hljs-type,
+.velata-editor .ProseMirror .hljs-title {
+  font-weight: 600;
+}
+.velata-editor .ProseMirror .hljs-comment,
+.velata-editor .ProseMirror .hljs-meta {
+  color: var(--ink-3);
+  font-style: italic;
+}
+.velata-editor .ProseMirror .hljs-string,
+.velata-editor .ProseMirror .hljs-number,
+.velata-editor .ProseMirror .hljs-attr {
+  color: var(--ink-2);
+}
