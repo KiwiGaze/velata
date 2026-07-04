@@ -12,6 +12,7 @@ const lowlight = createLowlight(common);
 export const velataExtensions: Extensions = [
   StarterKit.configure({
     codeBlock: false,
+    hardBreak: false,
     link: { openOnClick: false },
   }),
   Markdown.configure({ markedOptions: { gfm: true } }),

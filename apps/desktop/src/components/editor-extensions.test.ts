@@ -96,3 +96,11 @@ describe("velata markdown round-trip preserves structure", () => {
     expect(roundTrip(input)).toContain(word);
   });
 });
+
+describe("velata extension set", () => {
+  it("excludes hard break so ⌘↵ stays a window shortcut", () => {
+    const editor = new Editor({ extensions: velataExtensions });
+    expect(editor.extensionManager.extensions.map((e) => e.name)).not.toContain("hardBreak");
+    editor.destroy();
+  });
+});
