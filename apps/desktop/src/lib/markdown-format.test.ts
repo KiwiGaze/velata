@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  parseFormattedMarkdown,
-  sourceOffsetFromVisibleOffset,
-  visibleOffsetFromSourceOffset,
-} from "./markdown-format";
+import { parseFormattedMarkdown } from "./markdown-format";
 
 describe("parseFormattedMarkdown", () => {
   it("renders toolbar inline formatting as visible text without raw markers", () => {
@@ -51,17 +47,5 @@ describe("parseFormattedMarkdown", () => {
       "quote",
     ]);
     expect(document.lines.map((line) => line.marker)).toEqual(["- ", "1. ", "- [ ] ", "> "]);
-  });
-
-  it("maps visible offsets back to source offsets inside hidden markers", () => {
-    const document = parseFormattedMarkdown("**Hello**\nplain");
-
-    expect(sourceOffsetFromVisibleOffset(document, 0)).toBe(2);
-    expect(sourceOffsetFromVisibleOffset(document, 5)).toBe(7);
-    expect(sourceOffsetFromVisibleOffset(document, 6)).toBe(10);
-    expect(visibleOffsetFromSourceOffset(document, 0)).toBe(0);
-    expect(visibleOffsetFromSourceOffset(document, 4)).toBe(2);
-    expect(visibleOffsetFromSourceOffset(document, 9)).toBe(5);
-    expect(visibleOffsetFromSourceOffset(document, 10)).toBe(6);
   });
 });

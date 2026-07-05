@@ -6,12 +6,10 @@ export interface ScratchpadKeyHandlers {
   onCopyClose: () => void;
   onCutClose: () => void;
   onDismiss: () => void;
-  onUndo: () => void;
   onDeleteActive: () => void;
   onSelectIndex: (index: number) => void;
   onOpenPalette: () => void;
   onOpenSettings: () => void;
-  canUndo: boolean;
   draftCount: number;
   paletteOpen: boolean;
 }
@@ -29,7 +27,7 @@ export function useScratchpadKeys(handlers: ScratchpadKeyHandlers): void {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
-      if (event.isComposing) {
+      if (event.isComposing || event.defaultPrevented) {
         return;
       }
 
@@ -91,11 +89,6 @@ export function useScratchpadKeys(handlers: ScratchpadKeyHandlers): void {
           current.onSelectIndex(index);
         }
         return;
-      }
-
-      if (key === "z" && !event.shiftKey && current.canUndo) {
-        event.preventDefault();
-        current.onUndo();
       }
     }
 

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Fragment, type ReactElement } from "react";
 
-import { type FormatAction } from "@/lib/apply-format";
+import { type FormatAction } from "@/components/editor-extensions";
 
 interface FormattingToolbarProps {
   onApply: (action: FormatAction) => void;

@@ -224,3 +224,38 @@ Setup: a connected model in Settings; a multi-sentence messy draft in the scratc
 - [ ] Drag-resize narrower: the window refuses to shrink below the split minimum while split is on, and allows 560 again after leaving split.
 - [ ] Click `Split` again: the window restores the exact pre-split width; `⌘K` refines in place with the diff overlay (classic mode unchanged).
 - [ ] Toggle Split on while a classic refine is running: the refine cancels and the overlay dismisses.
+
+## 13. Tiptap rendered editor (Notion-like)
+
+Run `pnpm dev`, summon the ScratchPad (`⌘⇧Space`).
+
+### 13.1 Rendered editing
+- [ ] Type `# ` then text → renders as a heading (no visible `#`). `**bold**` → bold; `*italic*` → italic; `` `code` `` → inline code; `- ` → bullet; `1. ` → numbered; `> ` → quote.
+- [ ] A fenced code block ```` ```js ```` shows monochrome syntax highlighting (weight/italic only, no color).
+- [ ] No focus ring; 26px top / 40px side padding; text is near-black on paper.
+
+### 13.2 IME / mixed-language input (core scenario, WKWebView)
+- [ ] Pinyin IME: type a sentence mixing 中文 + English + numbers — no dropped/duplicated/reordered characters.
+- [ ] Japanese IME inside a **bold** span — かな→漢字 conversion commits cleanly, no restart loop.
+- [ ] Delete across a line break repeatedly — no crash (the regression this migration retires).
+
+### 13.3 Markdown fidelity (source of truth)
+- [ ] Type a doc using every toolbar format, `⌘↵` Copy & Close, paste elsewhere — the clipboard Markdown matches what you see.
+- [ ] Refine (`⌘K`), then compare — the refined text is clean Markdown (minor normalization like `*`→`_` is acceptable; no corruption or lost content).
+- [ ] Check-list (`- [ ] `) renders and toggles in the editor, but note it is **best-effort**: the task-list markdown is not in the guarded round-trip subset and may not survive reload/refine.
+- [ ] Hard breaks are out of scope: Enter starts a new paragraph and `⇧Enter` no longer inserts an in-paragraph line break, so a Markdown hard break (trailing `  ` / `\`) will not round-trip. Expected — the `⌘↵` fix disables HardBreak.
+
+### 13.4 Undo / redo
+- [ ] Type several words, `⌘Z` repeatedly walks back; `⌘⇧Z` redoes.
+- [ ] Apply a toolbar format, `⌘Z` reverts it.
+- [ ] Refine, `⌘Z` undoes the refine and the diff overlay disappears.
+- [ ] Switch drafts, type, `⌘Z` — undo does not cross into the previous draft.
+
+### 13.5 Selection refine + shortcuts
+- [ ] Select part of the text, `⌘K` — only the selection is refined and replaced in place. The selection is sent as plain text: inline formatting inside it (e.g. a **bold** word) is not preserved through refine — expected.
+- [ ] `⌘↵` while the editor is focused → Copy & Close (clipboard gets the text, the panel hides); it does **not** insert a line break. `⌘⇧↵` → Cut & Close likewise. (Regression guard: HardBreak's `⌘↵` binding is disabled.)
+- [ ] With the caret **inside a fenced code block**, `⌘↵` Copy & Close and `⌘⇧↵` Cut & Close still work — the editor must not exit the block or swallow the key. (To exit a code block, press `Enter` three times.)
+- [ ] After a `⌘1`–`⌘9` draft switch the editor stays focused (type immediately, no click needed).
+- [ ] `⌘W` delete draft, `⌘P` palette, `⌘,` settings, `esc` dismiss — all still work.
+- [ ] `⌘B` / `⌘I` toggle bold / italic (bonus from Tiptap); they do not trigger any window shortcut.
+- [ ] Split mode: left editor renders, right preview renders; `⌘↵` copies the refined preview.

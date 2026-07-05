@@ -21,6 +21,7 @@ import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } 
 import { DiffOverlay } from "@/components/diff-overlay";
 import { DraftsRail } from "@/components/drafts-rail";
 import { Editor, type EditorHandle } from "@/components/editor";
+import { type FormatAction } from "@/components/editor-extensions";
 import { FooterHints, type Hint } from "@/components/footer-hints";
 import { FormattingToolbar } from "@/components/formatting-toolbar";
 import { InstructionPalette } from "@/components/instruction-palette";
@@ -33,7 +34,6 @@ import { useLivePreview } from "@/hooks/use-live-preview";
 import { MissingApiKeyError, MissingModelError, useRefine } from "@/hooks/use-refine";
 import { useScratchpadKeys } from "@/hooks/use-scratchpad-keys";
 import { useSettings } from "@/hooks/use-settings";
-import { type FormatAction, planFormat } from "@/lib/apply-format";
 import { previewCopyText } from "@/lib/live-preview-scheduler";
 import { TARGET_OPTIONS, targetLanguageLabel, toTargetLanguage } from "@/lib/target-language";
 import { pickTransforms, TRANSFORM_COUNT } from "@/lib/transforms";
@@ -89,11 +89,6 @@ export function ScratchPad(): ReactElement {
     pickTransforms(TRANSFORM_PRESETS, TRANSFORM_COUNT, []),
   );
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [formatUndo, setFormatUndo] = useState<{
-    text: string;
-    selectionStart: number;
-    selectionEnd: number;
-  } | null>(null);
   const [splitMode, setSplitMode] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("clean");
   const preSplitWidthRef = useRef<number | null>(null);
@@ -143,7 +138,6 @@ export function ScratchPad(): ReactElement {
   const resetTransient = useCallback((): void => {
     abortRef.current?.abort();
     abortRef.current = null;
-    setFormatUndo(null);
     setPhase({ kind: "idle" });
   }, []);
 
@@ -165,6 +159,7 @@ export function ScratchPad(): ReactElement {
   function handleSelectDraft(id: string): void {
     resetTransient();
     selectDraft(id);
+    focusEditor();
   }
 
   function handleDeleteDraft(id: string): void {
@@ -186,7 +181,6 @@ export function ScratchPad(): ReactElement {
   }
 
   function handleTextChange(next: string): void {
-    setFormatUndo(null);
     updateActiveText(next);
     if (phase.kind === "refined" || phase.kind === "error") {
       setPhase({ kind: "idle" });
@@ -194,26 +188,13 @@ export function ScratchPad(): ReactElement {
   }
 
   function handleApplyFormat(action: FormatAction): void {
-    const editor = editorRef.current;
-    if (editor === null || phase.kind === "refining") {
+    if (phase.kind === "refining") {
       return;
     }
-    const selection = editor.getSelectionRange();
-    const plan = planFormat(activeText, selection.start, selection.end, action);
-    const next = `${activeText.slice(0, plan.replaceStart)}${plan.insert}${activeText.slice(plan.replaceEnd)}`;
-    setFormatUndo({
-      text: activeText,
-      selectionStart: selection.start,
-      selectionEnd: selection.end,
-    });
-    updateActiveText(next);
+    editorRef.current?.applyFormat(action);
     if (phase.kind === "refined" || phase.kind === "error") {
       setPhase({ kind: "idle" });
     }
-    requestAnimationFrame(() => {
-      editorRef.current?.focus();
-      editorRef.current?.setSelectionRange(plan.selectionStart, plan.selectionEnd);
-    });
   }
 
   function handleShuffleTransforms(): void {
@@ -225,17 +206,9 @@ export function ScratchPad(): ReactElement {
       return;
     }
 
-    let target = activeText;
-    let selectionStart = 0;
-    let selectionEnd = activeText.length;
-    let hasSelection = false;
-    const selection = editorRef.current?.getSelectionRange();
-    if (selection !== undefined && selection.start !== selection.end) {
-      selectionStart = selection.start;
-      selectionEnd = selection.end;
-      target = activeText.slice(selectionStart, selectionEnd);
-      hasSelection = true;
-    }
+    const selection = editorRef.current?.getSelection() ?? null;
+    const hasSelection = selection !== null && !isBlank(selection.text);
+    const target = hasSelection ? selection.text : activeText;
 
     if (isBlank(target)) {
       return;
@@ -252,10 +225,11 @@ export function ScratchPad(): ReactElement {
         if (controller.signal.aborted) {
           return;
         }
-        const next = hasSelection
-          ? `${previous.slice(0, selectionStart)}${result}${previous.slice(selectionEnd)}`
-          : result;
-        updateActiveText(next);
+        if (hasSelection) {
+          editorRef.current?.replaceRange(selection.from, selection.to, result);
+        } else {
+          updateActiveText(result);
+        }
         setPhase({ kind: "refined", previous });
         focusEditor();
       } catch (error) {
@@ -274,25 +248,6 @@ export function ScratchPad(): ReactElement {
         }
       }
     })();
-  }
-
-  function handleUndo(): void {
-    if (phase.kind === "refined") {
-      updateActiveText(phase.previous);
-      setPhase({ kind: "idle" });
-      focusEditor();
-      return;
-    }
-    if (formatUndo === null) {
-      return;
-    }
-    updateActiveText(formatUndo.text);
-    const { selectionStart, selectionEnd } = formatUndo;
-    setFormatUndo(null);
-    requestAnimationFrame(() => {
-      editorRef.current?.focus();
-      editorRef.current?.setSelectionRange(selectionStart, selectionEnd);
-    });
   }
 
   function handleDismissDiff(): void {
@@ -431,7 +386,6 @@ export function ScratchPad(): ReactElement {
     onCopyClose: handleCopyClose,
     onCutClose: handleCutClose,
     onDismiss: handleDismiss,
-    onUndo: handleUndo,
     onDeleteActive: handleDeleteActive,
     onSelectIndex: handleSelectIndex,
     onOpenPalette: () => {
@@ -442,7 +396,6 @@ export function ScratchPad(): ReactElement {
     onOpenSettings: () => {
       void invoke("open_settings");
     },
-    canUndo: phase.kind === "refined" || formatUndo !== null,
     draftCount: drafts.length,
     paletteOpen,
   });
@@ -524,6 +477,7 @@ export function ScratchPad(): ReactElement {
 
           <div className="flex min-h-0 flex-1">
             <Editor
+              key={activeId}
               ref={editorRef}
               value={activeText}
               onChange={handleTextChange}
