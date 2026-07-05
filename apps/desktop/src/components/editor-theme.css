@@ -14,6 +14,7 @@
 .velata-editor .ProseMirror:focus,
 .velata-editor .ProseMirror:focus-visible {
   outline: none;
+  box-shadow: none;
 }
 .velata-editor .ProseMirror > * + * {
   margin-top: 0.5em;
