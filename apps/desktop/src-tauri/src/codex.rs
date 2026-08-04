@@ -1985,18 +1985,42 @@ printf '12345' > "$output"
 
         let registry = CodexRegistry::default();
         let worker_registry = registry.clone();
+        let (sender, receiver) = mpsc::channel();
         let worker = thread::spawn(move || {
-            run_refine(
+            let result = run_refine(
                 &worker_registry,
                 request("timeout", "task", &"x".repeat(256 * 1024)),
                 run_options,
-            )
+            );
+            let _ = sender.send(result);
         });
         let process_id = wait_for_process_group(&registry, "timeout");
-        let error = worker
-            .join()
-            .expect("worker does not panic")
-            .expect_err("stubborn process times out");
+        let result = match receiver.recv_timeout(TEST_WAIT_TIMEOUT) {
+            Ok(result) => result,
+            Err(timeout_error) => {
+                let did_signal_owned_group = {
+                    let state = lock_unpoisoned(&registry.state);
+                    state.active.get("timeout").is_some_and(|run| {
+                        let process_group_id = lock_unpoisoned(&run.process_group_id);
+                        if *process_group_id == Some(process_id) {
+                            signal_process_group(process_id, libc::SIGKILL);
+                            true
+                        } else {
+                            false
+                        }
+                    })
+                };
+                let cleanup_result = receiver.recv_timeout(TEST_WAIT_TIMEOUT);
+                if cleanup_result.is_ok() {
+                    worker.join().expect("supervised worker does not panic");
+                }
+                panic!(
+                    "deadline worker did not return: {timeout_error}; signalled owned group: {did_signal_owned_group}; cleanup: {cleanup_result:?}"
+                );
+            }
+        };
+        worker.join().expect("worker does not panic");
+        let error = result.expect_err("stubborn process times out");
 
         assert_eq!(error.code, CodexSparkErrorCode::TimedOut);
         assert_process_is_gone(process_id);
