@@ -104,6 +104,19 @@ describe("Codex Spark adapter", () => {
     });
   });
 
+  it("rejects promptly when the primary request and cancellation never settle", async () => {
+    invokeMock.mockImplementation(() => new Promise<never>(() => undefined));
+    const controller = new AbortController();
+
+    const result = refineWithCodexSpark(DEFAULT_INSTRUCTION, "draft", controller.signal);
+    controller.abort();
+
+    await expect(result).rejects.toMatchObject({ name: "AbortError" });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "cancel_codex_spark", {
+      request: { requestId: REQUEST_ID },
+    });
+  });
+
   it("does not invoke the process for an already-aborted request", async () => {
     const controller = new AbortController();
     controller.abort();

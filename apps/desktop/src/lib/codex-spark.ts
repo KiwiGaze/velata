@@ -49,13 +49,6 @@ async function cancelCodexSpark(requestId: string): Promise<void> {
   }
 }
 
-async function waitForCancellation(cancellation: Promise<void> | undefined): Promise<void> {
-  if (cancellation === undefined) {
-    return;
-  }
-  await cancellation;
-}
-
 /** Refines raw input through the local Codex Spark command without an HTTP fallback. */
 export async function refineWithCodexSpark(
   instruction: Instruction,
@@ -67,33 +60,42 @@ export async function refineWithCodexSpark(
   }
 
   const requestId = crypto.randomUUID();
-  let cancellation: Promise<void> | undefined;
-  const handleAbort = (): void => {
-    cancellation = cancelCodexSpark(requestId);
-  };
-  signal?.addEventListener("abort", handleAbort, { once: true });
+  let handleAbort: (() => void) | undefined;
+  const abortRequest =
+    signal === undefined
+      ? undefined
+      : new Promise<never>((_resolve, reject) => {
+          handleAbort = (): void => {
+            void cancelCodexSpark(requestId);
+            reject(createAbortError());
+          };
+          signal.addEventListener("abort", handleAbort, { once: true });
+        });
 
   try {
-    const response = await invoke<unknown>("refine_with_codex_spark", {
+    const refineRequest = invoke<unknown>("refine_with_codex_spark", {
       request: {
         requestId,
         developerInstructions: buildCodexDeveloperInstructions(instruction),
         input,
       },
     });
+    const response = await (abortRequest === undefined
+      ? refineRequest
+      : Promise.race([refineRequest, abortRequest]));
     if (isSignalAborted(signal)) {
-      await waitForCancellation(cancellation);
       throw createAbortError();
     }
     return readRefineResponse(response).text;
   } catch (error) {
     if (isSignalAborted(signal)) {
-      await waitForCancellation(cancellation);
       throw createAbortError();
     }
     throw normalizeCodexSparkError(error);
   } finally {
-    signal?.removeEventListener("abort", handleAbort);
+    if (handleAbort !== undefined) {
+      signal?.removeEventListener("abort", handleAbort);
+    }
   }
 }
 

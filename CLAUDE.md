@@ -41,7 +41,7 @@ cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
-CI (`.github/workflows/ci.yml`, macos runner) requires all of: typecheck, lint, format check, test, build, `cargo fmt --check`, Rust test, clippy. All must be green.
+CI (`.github/workflows/ci.yml`, macOS runner) requires all of: typecheck, lint, format check, test, build, `cargo fmt --check`, Rust test, clippy. All must be green.
 
 `pnpm-workspace.yaml` sets `minimumReleaseAge: 1440` — packages published less than 24h ago will not resolve.
 

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, createElement, type ReactNode } from "react";
+import { act, createElement, type ReactNode, type Ref } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -65,7 +65,7 @@ vi.mock("@/components/editor", async () => {
   const { createElement: element, useImperativeHandle } = await import("react");
   interface EditorProps {
     readonly value: string;
-    readonly ref: React.Ref<{
+    readonly ref: Ref<{
       focus: () => void;
       getSelection: () => null;
       replaceRange: () => void;
