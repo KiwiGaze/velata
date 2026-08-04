@@ -1,4 +1,4 @@
-import { Separator, Tooltip, TooltipContent, TooltipTrigger } from "@velata/ui";
+import { Button, Separator, Tooltip, TooltipContent, TooltipTrigger } from "@velata/ui";
 import {
   Bold,
   Code,
@@ -70,8 +70,9 @@ export function FormattingToolbar({ onApply }: FormattingToolbarProps): ReactEle
           {group.buttons.map(({ action, label, icon: Icon }) => (
             <Tooltip key={action}>
               <TooltipTrigger asChild>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   aria-label={label}
                   onMouseDown={preventEditorBlur}
                   onClick={() => {
@@ -80,7 +81,7 @@ export function FormattingToolbar({ onApply }: FormattingToolbarProps): ReactEle
                   className={TOOLBAR_ICON_BUTTON_CLASS}
                 >
                   <Icon aria-hidden className="size-3.5" />
-                </button>
+                </Button>
               </TooltipTrigger>
               <TooltipContent side="top">{label}</TooltipContent>
             </Tooltip>

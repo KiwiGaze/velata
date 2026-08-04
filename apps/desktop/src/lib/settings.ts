@@ -36,10 +36,16 @@ const SETTINGS_KEY = "settings";
 
 // The Tauri store plugin returns the same instance for a given path; cache the
 // resolved promise (lazily, so importing this module never touches the store)
-// so load/save/subscribe don't each re-open the store.
+// so load/save/subscribe don't each re-open the store. A failed open clears
+// the cache so the next operation retries instead of reusing the rejected
+// promise forever.
 let storePromise: ReturnType<typeof load> | null = null;
 function getStore(): ReturnType<typeof load> {
-  return (storePromise ??= load(STORE_PATH, STORE_OPTIONS));
+  storePromise ??= load(STORE_PATH, STORE_OPTIONS).catch((error: unknown) => {
+    storePromise = null;
+    throw error;
+  });
+  return storePromise;
 }
 
 /** Reads persisted settings, filling any missing key from `DEFAULT_SETTINGS`. */

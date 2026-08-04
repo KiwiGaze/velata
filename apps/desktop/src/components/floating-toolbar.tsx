@@ -42,9 +42,9 @@ export function FloatingToolbar({
   );
 }
 
-/** Shared className for a compact icon button inside a floating toolbar. */
+/** Shared className for a compact icon Button inside a floating toolbar. */
 export const TOOLBAR_ICON_BUTTON_CLASS =
-  "text-ink-2 hover:bg-raise hover:text-ink inline-flex size-7 items-center justify-center rounded-[7px] transition-colors";
+  "text-ink-2 hover:bg-raise hover:text-ink inline-flex size-7 items-center justify-center rounded-[7px] border-0 bg-transparent p-0 transition-colors";
 
 /** Shared `onMouseDown` that prevents the editor from losing selection on toolbar press. */
 export function preventEditorBlur(event: MouseEvent): void {

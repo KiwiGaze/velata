@@ -30,8 +30,9 @@ export function TransformBar({
       trailing={
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               aria-label="New batch"
               onMouseDown={preventEditorBlur}
               onClick={() => {
@@ -40,7 +41,7 @@ export function TransformBar({
               className={TOOLBAR_ICON_BUTTON_CLASS}
             >
               <RefreshCw aria-hidden className="size-3.5" />
-            </button>
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="top">New batch</TooltipContent>
         </Tooltip>

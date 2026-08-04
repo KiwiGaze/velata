@@ -26,5 +26,5 @@ export function describeRefineError(error: unknown): string {
   if (error instanceof MissingApiKeyError || error instanceof MissingModelError) {
     return CONNECT_MESSAGE;
   }
-  return error instanceof Error ? error.message : "Refine failed";
+  return error instanceof Error && error.message.length > 0 ? error.message : "Refine failed";
 }
