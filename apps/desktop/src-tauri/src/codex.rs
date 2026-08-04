@@ -20,6 +20,31 @@ const CODEX_USER_PROMPT: &str = "Refine the draft provided through stdin.";
 const TOMBSTONE_TTL: Duration = Duration::from_secs(60);
 const MAX_TOMBSTONES: usize = 256;
 const MAX_REQUEST_ID_BYTES: usize = 128;
+const DISABLED_CODEX_FEATURES: &[&str] = &[
+    "shell_tool",
+    "unified_exec",
+    "apps",
+    "plugins",
+    "remote_plugin",
+    "multi_agent",
+    "multi_agent_v2",
+    "browser_use",
+    "browser_use_external",
+    "browser_use_full_cdp_access",
+    "computer_use",
+    "image_generation",
+    "in_app_browser",
+    "goals",
+    "hooks",
+    "shell_snapshot",
+    "memories",
+    "skill_mcp_dependency_install",
+    "workspace_dependencies",
+    "code_mode_host",
+    "auth_elicitation",
+    "tool_call_mcp_elicitation",
+    "tool_suggest",
+];
 static RUN_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Copy)]
@@ -269,12 +294,7 @@ pub async fn refine_with_codex_spark(
         Ok(RefineResponse { text })
     })
     .await
-    .unwrap_or_else(|_| {
-        Err(CodexSparkError::new(
-            CodexSparkErrorCode::ExecutionFailed,
-            "Refine failed.",
-        ))
-    })
+    .unwrap_or_else(|_| Err(execution_failed()))
 }
 
 #[tauri::command]
@@ -324,9 +344,7 @@ fn run_refine(
         Some(_) => return Err(cli_not_found()),
         None => find_codex_executable().ok_or_else(cli_not_found)?,
     };
-    let run_directory = create_run_directory(&options.temp_root).map_err(|_| {
-        CodexSparkError::new(CodexSparkErrorCode::ExecutionFailed, "Refine failed.")
-    })?;
+    let run_directory = create_run_directory(&options.temp_root).map_err(|_| execution_failed())?;
     let output_path = run_directory.0.join("final-message.md");
     let outcome = execute_process(
         &executable,
@@ -337,16 +355,14 @@ fn run_refine(
         Arc::clone(&active_run),
         options.limits,
     );
-    let result = match outcome? {
+    match outcome? {
         ProcessOutcome::Exited(status, _) if status.success() => {
             read_final_output(&output_path, options.limits.max_output_bytes)
         }
         ProcessOutcome::Exited(_, diagnostics) => Err(classify_diagnostics(&diagnostics)),
         ProcessOutcome::Cancelled => Err(CodexSparkError::cancelled()),
         ProcessOutcome::TimedOut => Err(CodexSparkError::timed_out()),
-    };
-    drop(run_directory);
-    result
+    }
 }
 
 fn validate_request(request: &RefineRequest, limits: RunLimits) -> Result<(), CodexSparkError> {
@@ -397,6 +413,7 @@ fn resolve_codex_executable(
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();
+    let nvm_version_directories = home.map(find_nvm_version_directories).unwrap_or_default();
     let mut candidates = Vec::new();
     candidates.extend(
         inherited_directories
@@ -413,20 +430,18 @@ fn resolve_codex_executable(
             home.join(".local/share/mise/shims/codex"),
             home.join(".local/share/fnm/aliases/default/bin/codex"),
         ]);
-        candidates.extend(find_nvm_codex_candidates(home));
+        candidates.extend(
+            nvm_version_directories
+                .iter()
+                .map(|directory| directory.join("codex")),
+        );
     }
     candidates.extend(system_candidates.iter().cloned());
-    let runtime_directories = find_supported_node_directories(home, system_candidates);
+    let runtime_directories =
+        find_supported_node_directories(home, system_candidates, &nvm_version_directories);
     candidates.into_iter().find_map(|candidate| {
         resolve_codex_candidate(&candidate, &inherited_directories, &runtime_directories)
     })
-}
-
-fn find_nvm_codex_candidates(home: &Path) -> Vec<PathBuf> {
-    find_nvm_version_directories(home)
-        .into_iter()
-        .map(|directory| directory.join("codex"))
-        .collect()
 }
 
 fn find_nvm_version_directories(home: &Path) -> Vec<PathBuf> {
@@ -448,6 +463,7 @@ fn find_nvm_version_directories(home: &Path) -> Vec<PathBuf> {
 fn find_supported_node_directories(
     home: Option<&Path>,
     system_candidates: &[PathBuf],
+    nvm_version_directories: &[PathBuf],
 ) -> Vec<PathBuf> {
     let mut directories = Vec::new();
     if let Some(home) = home {
@@ -457,7 +473,7 @@ fn find_supported_node_directories(
             home.join(".local/share/mise/shims"),
             home.join(".local/share/fnm/aliases/default/bin"),
         ]);
-        directories.extend(find_nvm_version_directories(home));
+        directories.extend(nvm_version_directories.iter().cloned());
     }
     directories.extend(
         system_candidates
@@ -661,8 +677,8 @@ fn execute_process(
     *lock_unpoisoned(&active_run.process_group_id) = None;
     join_io_threads(stdin_thread, stdout_thread, stderr_thread);
     let diagnostics = ProcessDiagnostics {
-        stdout: lock_unpoisoned(&stdout).clone(),
-        stderr: lock_unpoisoned(&stderr).clone(),
+        stdout: std::mem::take(&mut *lock_unpoisoned(&stdout)),
+        stderr: std::mem::take(&mut *lock_unpoisoned(&stderr)),
     };
     if active_run.cancelled.load(Ordering::Acquire) {
         return Ok(ProcessOutcome::Cancelled);
@@ -680,7 +696,7 @@ fn build_arguments(
 ) -> Result<Vec<OsString>, CodexSparkError> {
     let developer_instructions =
         serde_json::to_string(developer_instructions).map_err(|_| execution_failed())?;
-    Ok([
+    let mut arguments = vec![
         OsString::from("exec"),
         OsString::from("--ephemeral"),
         OsString::from("--strict-config"),
@@ -703,60 +719,19 @@ fn build_arguments(
         OsString::from("project_doc_max_bytes=0"),
         OsString::from("-c"),
         OsString::from("agents.enabled=false"),
-        OsString::from("--disable"),
-        OsString::from("shell_tool"),
-        OsString::from("--disable"),
-        OsString::from("unified_exec"),
-        OsString::from("--disable"),
-        OsString::from("apps"),
-        OsString::from("--disable"),
-        OsString::from("plugins"),
-        OsString::from("--disable"),
-        OsString::from("remote_plugin"),
-        OsString::from("--disable"),
-        OsString::from("multi_agent"),
-        OsString::from("--disable"),
-        OsString::from("multi_agent_v2"),
-        OsString::from("--disable"),
-        OsString::from("browser_use"),
-        OsString::from("--disable"),
-        OsString::from("browser_use_external"),
-        OsString::from("--disable"),
-        OsString::from("browser_use_full_cdp_access"),
-        OsString::from("--disable"),
-        OsString::from("computer_use"),
-        OsString::from("--disable"),
-        OsString::from("image_generation"),
-        OsString::from("--disable"),
-        OsString::from("in_app_browser"),
-        OsString::from("--disable"),
-        OsString::from("goals"),
-        OsString::from("--disable"),
-        OsString::from("hooks"),
-        OsString::from("--disable"),
-        OsString::from("shell_snapshot"),
-        OsString::from("--disable"),
-        OsString::from("memories"),
-        OsString::from("--disable"),
-        OsString::from("skill_mcp_dependency_install"),
-        OsString::from("--disable"),
-        OsString::from("workspace_dependencies"),
-        OsString::from("--disable"),
-        OsString::from("code_mode_host"),
-        OsString::from("--disable"),
-        OsString::from("auth_elicitation"),
-        OsString::from("--disable"),
-        OsString::from("tool_call_mcp_elicitation"),
-        OsString::from("--disable"),
-        OsString::from("tool_suggest"),
+    ];
+    for &feature in DISABLED_CODEX_FEATURES {
+        arguments.push(OsString::from("--disable"));
+        arguments.push(OsString::from(feature));
+    }
+    arguments.extend([
         OsString::from("--color"),
         OsString::from("never"),
         OsString::from("--output-last-message"),
         output_path.as_os_str().to_owned(),
         OsString::from(CODEX_USER_PROMPT),
-    ]
-    .into_iter()
-    .collect())
+    ]);
+    Ok(arguments)
 }
 
 fn spawn_drain(
@@ -850,23 +825,10 @@ fn read_final_output(path: &Path, max_bytes: usize) -> Result<String, CodexSpark
         .read(true)
         .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
         .open(path)
-        .map_err(|_| {
-            CodexSparkError::new(
-                CodexSparkErrorCode::OutputUnreadable,
-                "Could not read the refined output.",
-            )
-        })?;
-    let metadata = file.metadata().map_err(|_| {
-        CodexSparkError::new(
-            CodexSparkErrorCode::OutputUnreadable,
-            "Could not read the refined output.",
-        )
-    })?;
+        .map_err(|_| output_unreadable())?;
+    let metadata = file.metadata().map_err(|_| output_unreadable())?;
     if !metadata.file_type().is_file() {
-        return Err(CodexSparkError::new(
-            CodexSparkErrorCode::OutputUnreadable,
-            "Could not read the refined output.",
-        ));
+        return Err(output_unreadable());
     }
     if metadata.len() > max_bytes as u64 {
         return Err(CodexSparkError::new(
@@ -877,24 +839,14 @@ fn read_final_output(path: &Path, max_bytes: usize) -> Result<String, CodexSpark
     let mut bytes = Vec::new();
     file.take((max_bytes + 1) as u64)
         .read_to_end(&mut bytes)
-        .map_err(|_| {
-            CodexSparkError::new(
-                CodexSparkErrorCode::OutputUnreadable,
-                "Could not read the refined output.",
-            )
-        })?;
+        .map_err(|_| output_unreadable())?;
     if bytes.len() > max_bytes {
         return Err(CodexSparkError::new(
             CodexSparkErrorCode::OutputTooLarge,
             "Codex response is too large.",
         ));
     }
-    let text = String::from_utf8(bytes).map_err(|_| {
-        CodexSparkError::new(
-            CodexSparkErrorCode::OutputUnreadable,
-            "Could not read the refined output.",
-        )
-    })?;
+    let text = String::from_utf8(bytes).map_err(|_| output_unreadable())?;
     let text = text.trim();
     if text.is_empty() {
         Err(CodexSparkError::new(
@@ -973,6 +925,13 @@ fn cli_not_found() -> CodexSparkError {
 
 fn execution_failed() -> CodexSparkError {
     CodexSparkError::new(CodexSparkErrorCode::ExecutionFailed, "Refine failed.")
+}
+
+fn output_unreadable() -> CodexSparkError {
+    CodexSparkError::new(
+        CodexSparkErrorCode::OutputUnreadable,
+        "Could not read the refined output.",
+    )
 }
 
 fn prune_tombstones(tombstones: &mut VecDeque<Tombstone>, now: Instant) {
@@ -1058,12 +1017,17 @@ mod tests {
             .flatten()
             .collect::<Vec<_>>();
         let home = env::var_os("HOME").map(PathBuf::from);
+        let nvm_version_directories = home
+            .as_deref()
+            .map(find_nvm_version_directories)
+            .unwrap_or_default();
         let runtime_directories = find_supported_node_directories(
             home.as_deref(),
             &[
                 PathBuf::from("/opt/homebrew/bin/codex"),
                 PathBuf::from("/usr/local/bin/codex"),
             ],
+            &nvm_version_directories,
         );
         let child_path = env::join_paths(child_path_directories(
             executable.parent(),
@@ -1206,6 +1170,22 @@ mod tests {
             .map(|executable| executable.path),
             Some(system_codex)
         );
+    }
+
+    #[test]
+    fn run_directory_uses_private_permissions() {
+        let directory = TestDirectory::new();
+        let run_directory =
+            create_run_directory(directory.path()).expect("create private run directory");
+        let permissions = fs::metadata(&run_directory.0)
+            .expect("read run directory metadata")
+            .permissions()
+            .mode();
+
+        assert_eq!(permissions & 0o777, 0o700);
+
+        drop(run_directory);
+        assert_no_run_directories(directory.path());
     }
 
     #[test]

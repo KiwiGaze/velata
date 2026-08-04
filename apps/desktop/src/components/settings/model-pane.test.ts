@@ -210,6 +210,15 @@ describe("ModelPane", () => {
     expect(mocks.settings.model).toBe("gpt-4.1");
     expect(container.textContent).toContain("not tested");
     expect(container.textContent).not.toContain("connected");
+
+    await selectProvider("openai");
+
+    expect(container.querySelector<HTMLInputElement>("#model-base-url")?.value).toBe(
+      "https://api.openai.com/v1",
+    );
+    expect(container.querySelector<HTMLInputElement>('input[aria-label="Model"]')?.value).toBe(
+      "gpt-4.1",
+    );
   });
 
   it("does not continue a deferred key lookup after the provider changes", async () => {

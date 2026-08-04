@@ -49,7 +49,7 @@ CI (`.github/workflows/ci.yml`, macOS runner) requires all of: typecheck, lint, 
 
 Monorepo rule: `apps/*` may depend on `packages/*`, never the reverse; no cycles. All packages are consumed **as source** (`exports` point at `src/`) — nothing except the desktop app has a build step.
 
-- **`packages/core`** — provider-agnostic refine logic. Pure TypeScript: no React, no Tauri imports. Holds the `Instruction` model, the default refine prompt (with the literal `{target}` token substituted by `buildSystemPrompt`), and `refine()` / `testConnection()` against any OpenAI-compatible `/chat/completions` endpoint. Network access is injected via `fetchImpl`, which is what keeps it platform-agnostic and unit-testable. Its prompt and HTTP client tests live here.
+- **`packages/core`** — provider-agnostic refine logic. Pure TypeScript: no React, no Tauri imports. Holds the `Instruction` model, the default refine prompt (with the literal `{target}` token substituted by `buildSystemPrompt`), and `refine()` / `testConnection()` against any OpenAI-compatible `/chat/completions` endpoint. Network access is injected via `fetchImpl`, which is what keeps it platform-agnostic and unit-testable.
 - **`packages/ui`** — shadcn/ui copy-in components (Radix) plus `globals.css` tokens. Components are stripped of default rounding/shadow/color to match the clean-sheet design language.
 - **`packages/config`** — shared `tsconfig.base.json`, the `velataEslint({ tsconfigRootDir })` flat-config factory, and Prettier config.
 - **`apps/desktop`** — the Tauri v2 app.

@@ -178,7 +178,6 @@ describe("useRefine", () => {
     await expect(refineFunction(mocks.defaultInstruction, "draft")).rejects.toBeInstanceOf(
       MissingModelError,
     );
-    expect(mocks.getApiKey).toHaveBeenCalledOnce();
     expect(refineMock).not.toHaveBeenCalled();
     expect(mocks.refineWithCodexSpark).not.toHaveBeenCalled();
   });

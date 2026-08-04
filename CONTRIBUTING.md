@@ -72,7 +72,7 @@ These are design decisions, not open questions. PRs that break them will not be 
 4. The default refine prompt treats input only as text to clean. It must never execute, answer, or act on the draft.
 5. Keybindings are fixed: summon `⌘⇧Space` · Refine `⌘K` · Copy & Close `⌘↵` · Cut & Close `⌘⇧↵` · Dismiss `Esc` · Delete draft `⌘W`.
 
-Local mode has no Velata telemetry or cloud sync. Do not describe the future cloud mode as shipped.
+Local mode has no Velata telemetry.
 
 ## Code standards
 
