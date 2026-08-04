@@ -34,13 +34,18 @@ export function SettingsProvider({ children }: { children: ReactNode }): ReactEl
   useEffect(() => {
     let active = true;
     let unlisten: (() => void) | null = null;
+    let broadcastApplied = false;
     void loadSettings()
       .then((loaded) => {
-        if (active) {
+        if (!active) {
+          return;
+        }
+        // A change broadcast while the initial read was in flight is newer.
+        if (!broadcastApplied) {
           settingsRef.current = loaded;
           setSettings(loaded);
-          setLoading(false);
         }
+        setLoading(false);
       })
       .catch(() => {
         // Store unreadable: keep the defaults and leave the loading state.
@@ -50,16 +55,21 @@ export function SettingsProvider({ children }: { children: ReactNode }): ReactEl
       });
     void subscribeSettings((next) => {
       if (active) {
+        broadcastApplied = true;
         settingsRef.current = next;
         setSettings(next);
       }
-    }).then((fn) => {
-      if (active) {
-        unlisten = fn;
-      } else {
-        fn();
-      }
-    });
+    })
+      .then((fn) => {
+        if (active) {
+          unlisten = fn;
+        } else {
+          fn();
+        }
+      })
+      .catch(() => {
+        // Subscription unavailable: the initial load still controls loading.
+      });
     return () => {
       active = false;
       unlisten?.();

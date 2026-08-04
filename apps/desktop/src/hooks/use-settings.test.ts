@@ -112,4 +112,49 @@ describe("SettingsProvider", () => {
 
     expect(container.textContent).toBe(`ready:${settingsMocks.defaultSettings.provider}`);
   });
+
+  it("keeps the defaults and stops loading when the subscription fails to start", async () => {
+    settingsMocks.loadSettings.mockResolvedValue(settingsMocks.defaultSettings);
+    settingsMocks.subscribeSettings.mockRejectedValue(new Error("store open failed"));
+
+    const container = document.createElement("div");
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(createElement(SettingsProvider, null, createElement(LoadingProbe)));
+    });
+    await flush();
+
+    expect(container.textContent).toBe(`ready:${settingsMocks.defaultSettings.provider}`);
+  });
+
+  it("keeps a broadcast change that arrives while the initial load is in flight", async () => {
+    let resolveLoad!: (settings: AppSettings) => void;
+    settingsMocks.loadSettings.mockReturnValue(
+      new Promise<AppSettings>((resolve) => {
+        resolveLoad = resolve;
+      }),
+    );
+    settingsMocks.subscribeSettings.mockResolvedValue(() => undefined);
+
+    const container = document.createElement("div");
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(createElement(SettingsProvider, null, createElement(LoadingProbe)));
+    });
+    await flush();
+
+    const broadcast = settingsMocks.subscribeSettings.mock.calls[0]?.[0];
+    if (broadcast === undefined) {
+      throw new Error("SettingsProvider did not subscribe to settings changes");
+    }
+    act(() => {
+      broadcast({ ...settingsMocks.defaultSettings, provider: "openai" });
+    });
+    resolveLoad({ ...settingsMocks.defaultSettings, provider: "stale" });
+    await flush();
+
+    expect(container.textContent).toBe("ready:openai");
+  });
 });
