@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -28,18 +29,21 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 export function SettingsProvider({ children }: { children: ReactNode }): ReactElement {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
+  const settingsRef = useRef<AppSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     let active = true;
     let unlisten: (() => void) | null = null;
     void loadSettings().then((loaded) => {
       if (active) {
+        settingsRef.current = loaded;
         setSettings(loaded);
         setLoading(false);
       }
     });
     void subscribeSettings((next) => {
       if (active) {
+        settingsRef.current = next;
         setSettings(next);
       }
     }).then((fn) => {
@@ -55,14 +59,12 @@ export function SettingsProvider({ children }: { children: ReactNode }): ReactEl
     };
   }, []);
 
-  const updateSettings = useCallback(
-    async (patch: Partial<AppSettings>): Promise<void> => {
-      const next: AppSettings = { ...settings, ...patch };
-      setSettings(next);
-      await saveSettings(next);
-    },
-    [settings],
-  );
+  const updateSettings = useCallback(async (patch: Partial<AppSettings>): Promise<void> => {
+    const next: AppSettings = { ...settingsRef.current, ...patch };
+    settingsRef.current = next;
+    setSettings(next);
+    await saveSettings(next);
+  }, []);
 
   const value = useMemo<SettingsContextValue>(
     () => ({ settings, updateSettings, loading }),

@@ -16,5 +16,5 @@ export {
   type TargetLanguage,
 } from "./instruction";
 export { buildSystemPrompt } from "./prompt";
-export { isBlank } from "./text";
+export { countWords, isBlank } from "./text";
 export { TRANSFORM_PRESETS } from "./transform-presets";

@@ -8,6 +8,7 @@ import {
 } from "@tauri-apps/api/window";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
+  countWords,
   DEFAULT_INSTRUCTION,
   type Instruction,
   isBlank,
@@ -31,10 +32,11 @@ import { ResizeHandles } from "@/components/resize-handles";
 import { TransformBar } from "@/components/transform-bar";
 import { useDrafts } from "@/hooks/use-drafts";
 import { useLivePreview } from "@/hooks/use-live-preview";
-import { MissingApiKeyError, MissingModelError, useRefine } from "@/hooks/use-refine";
+import { useRefine } from "@/hooks/use-refine";
 import { useScratchpadKeys } from "@/hooks/use-scratchpad-keys";
 import { useSettings } from "@/hooks/use-settings";
 import { previewCopyText } from "@/lib/live-preview-scheduler";
+import { describeRefineError } from "@/lib/refine-errors";
 import { TARGET_OPTIONS, targetLanguageLabel, toTargetLanguage } from "@/lib/target-language";
 import { pickTransforms, TRANSFORM_COUNT } from "@/lib/transforms";
 
@@ -61,14 +63,6 @@ const SPLIT_HINTS: readonly Hint[] = [
 const SPLIT_MIN_WIDTH = 1000;
 
 const ERROR_MAX_LENGTH = 80;
-
-function countWords(text: string): number {
-  const trimmed = text.trim();
-  if (trimmed.length === 0) {
-    return 0;
-  }
-  return trimmed.split(/\s+/).length;
-}
 
 function truncateError(message: string): string {
   if (message.length <= ERROR_MAX_LENGTH) {
@@ -102,8 +96,10 @@ export function ScratchPad(): ReactElement {
     });
   }, []);
 
-  const instruction: Instruction =
-    settings.instructions.find((entry) => entry.isDefault) ?? DEFAULT_INSTRUCTION;
+  const instruction = useMemo<Instruction>(
+    () => settings.instructions.find((entry) => entry.isDefault) ?? DEFAULT_INSTRUCTION,
+    [settings.instructions],
+  );
   const refining = phase.kind === "refining";
   const formattingOpen = activePanel === "formatting";
   const transformsOpen = activePanel === "transforms";
@@ -236,12 +232,7 @@ export function ScratchPad(): ReactElement {
         if (controller.signal.aborted) {
           return;
         }
-        if (error instanceof MissingApiKeyError || error instanceof MissingModelError) {
-          setPhase({ kind: "error", message: "Connect a model in Settings" });
-        } else {
-          const message = error instanceof Error ? error.message : "Refine failed";
-          setPhase({ kind: "error", message: truncateError(message) });
-        }
+        setPhase({ kind: "error", message: truncateError(describeRefineError(error)) });
       } finally {
         if (abortRef.current === controller) {
           abortRef.current = null;
@@ -312,30 +303,26 @@ export function ScratchPad(): ReactElement {
     void enterSplitSize(session).catch(() => undefined);
   }
 
-  function handleCopyClose(): void {
+  function closeAndHide({ deleteActive }: { deleteActive: boolean }): void {
     void (async () => {
       await writeText(
         splitMode && preview.draftKey === activeId
           ? previewCopyText(preview, activeText)
           : activeText,
       );
-      if (!settings.keepDraftHistory) {
+      if (deleteActive) {
         handleDeleteActive();
       }
       await invoke("hide_scratchpad");
     })();
   }
 
+  function handleCopyClose(): void {
+    closeAndHide({ deleteActive: !settings.keepDraftHistory });
+  }
+
   function handleCutClose(): void {
-    void (async () => {
-      await writeText(
-        splitMode && preview.draftKey === activeId
-          ? previewCopyText(preview, activeText)
-          : activeText,
-      );
-      handleDeleteActive();
-      await invoke("hide_scratchpad");
-    })();
+    closeAndHide({ deleteActive: true });
   }
 
   function handleDismiss(): void {

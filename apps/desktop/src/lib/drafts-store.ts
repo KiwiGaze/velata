@@ -12,12 +12,16 @@ const STORE_PATH = "drafts.json";
 const STORE_OPTIONS = { defaults: {}, autoSave: false };
 const WORKSPACE_KEY = "workspace";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+// The Tauri store plugin returns the same instance for a given path; cache the
+// resolved promise (lazily, so importing this module never touches the store)
+// so the debounced save path doesn't re-open the store on every call.
+let storePromise: ReturnType<typeof load> | null = null;
+function getStore(): ReturnType<typeof load> {
+  return (storePromise ??= load(STORE_PATH, STORE_OPTIONS));
 }
 
-function isUnknownArray(value: unknown): value is readonly unknown[] {
-  return Array.isArray(value);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function isDraft(value: unknown): value is Draft {
@@ -34,13 +38,13 @@ function isWorkspace(value: unknown): value is Workspace {
     return false;
   }
   const drafts = value["drafts"];
-  return isUnknownArray(drafts) && drafts.every(isDraft) && typeof value["activeId"] === "string";
+  return Array.isArray(drafts) && drafts.every(isDraft) && typeof value["activeId"] === "string";
 }
 
 /** Reads the persisted workspace, returning null when it is absent, malformed, or unreadable. */
 export async function loadWorkspace(): Promise<Workspace | null> {
   try {
-    const store = await load(STORE_PATH, STORE_OPTIONS);
+    const store = await getStore();
     const stored = await store.get<unknown>(WORKSPACE_KEY);
     return isWorkspace(stored) ? stored : null;
   } catch {
@@ -50,7 +54,7 @@ export async function loadWorkspace(): Promise<Workspace | null> {
 
 /** Persists the full workspace to the drafts store in a single write. */
 export async function saveWorkspace(workspace: Workspace): Promise<void> {
-  const store = await load(STORE_PATH, STORE_OPTIONS);
+  const store = await getStore();
   await store.set(WORKSPACE_KEY, workspace);
   await store.save();
 }

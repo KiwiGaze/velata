@@ -1,6 +1,6 @@
 import { cn, Tooltip, TooltipContent, TooltipTrigger } from "@velata/ui";
 import { Trash2 } from "lucide-react";
-import { type ReactElement, type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactElement, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { type Draft } from "@/hooks/use-drafts";
 import { type DraftMatch, firstNonEmptySourceLine, type HighlightRange } from "@/lib/draft-search";
@@ -95,9 +95,11 @@ export function DraftRow({
   const [truncated, setTruncated] = useState(false);
 
   const sourceTitle = firstNonEmptySourceLine(draft.text);
-  const formattedTitle = sourceTitle === null ? null : parseFormattedMarkdown(sourceTitle);
-  const titleLine = formattedTitle?.lines[0] ?? null;
-  const title = formattedTitle?.visibleText.trim() ?? "";
+  const titleLine = useMemo(
+    () => (sourceTitle === null ? null : (parseFormattedMarkdown(sourceTitle).lines[0] ?? null)),
+    [sourceTitle],
+  );
+  const title = titleLine?.visibleText.trim() ?? "";
   const isEmpty = title.length === 0;
   const label = isEmpty ? "New draft" : title;
   const snippet = match?.snippet ?? null;

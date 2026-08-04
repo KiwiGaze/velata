@@ -1,5 +1,7 @@
 import { type Instruction, isBlank, normalizeStructureOutput } from "@velata/core";
 
+import { describeRefineError } from "@/lib/refine-errors";
+
 /** Lifecycle phase of the live preview. */
 export type PreviewPhase = "idle" | "refreshing" | "ready" | "error";
 
@@ -27,10 +29,6 @@ export interface LivePreviewScheduler {
 
 /** Idle time after the last edit before the preview auto-refines. */
 export const PREVIEW_DEBOUNCE_MS = 1500;
-
-const CONNECT_MESSAGE = "Connect a model in Settings";
-
-const CONFIG_ERROR_NAMES = new Set(["MissingApiKeyError", "MissingModelError"]);
 
 interface LastRefined {
   source: string;
@@ -114,7 +112,7 @@ export function createLivePreviewScheduler(
         if (current.signal.aborted || id !== requestId || key !== draftKey) {
           return;
         }
-        emit("error", describeError(error));
+        emit("error", describeRefineError(error));
       })
       .finally(() => {
         if (controller === current) {
@@ -146,11 +144,4 @@ export function createLivePreviewScheduler(
       clear();
     },
   };
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof Error && CONFIG_ERROR_NAMES.has(error.name)) {
-    return CONNECT_MESSAGE;
-  }
-  return error instanceof Error ? error.message : "Refine failed";
 }
