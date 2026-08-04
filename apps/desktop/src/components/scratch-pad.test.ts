@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type RefineFn } from "@/hooks/use-refine";
+import { CodexSparkError } from "@/lib/refine-errors";
 
 const mocks = vi.hoisted(() => ({
   activeText: "raw draft",
@@ -143,7 +144,7 @@ function createDeferred(): Deferred {
   return { promise, resolve, reject };
 }
 
-describe("ScratchPad provider switching", () => {
+describe("ScratchPad classic refine lifecycle", () => {
   let container: HTMLDivElement;
   let root: Root | null;
 
@@ -216,4 +217,31 @@ describe("ScratchPad provider switching", () => {
       expect(container.textContent).not.toContain("stale provider error");
     },
   );
+
+  it("keeps the draft unchanged and stops progress when the current provider requires login", async () => {
+    const request = createDeferred();
+    mocks.settings.provider = "codex-spark";
+    mocks.refine.mockReturnValueOnce(request.promise);
+    render();
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+    });
+    expect(container.querySelector('[data-testid="progress"]')?.getAttribute("data-active")).toBe(
+      "true",
+    );
+
+    await act(async () => {
+      request.reject(new CodexSparkError("auth-required"));
+      await Promise.resolve();
+    });
+
+    expect(mocks.refine).toHaveBeenCalledOnce();
+    expect(mocks.updateActiveText).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="editor"]')?.textContent).toBe("raw draft");
+    expect(container.querySelector('[data-testid="progress"]')?.getAttribute("data-active")).toBe(
+      "false",
+    );
+    expect(container.textContent).toContain("Run `codex login`.");
+  });
 });

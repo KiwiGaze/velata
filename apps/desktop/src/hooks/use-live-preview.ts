@@ -82,6 +82,7 @@ export function useLivePreview(inputs: LivePreviewInputs): LivePreview {
       return;
     }
     if (tracked.provider !== provider) {
+      scheduler.reset(draftId);
       scheduler.refreshNow(source, instruction, draftId);
       return;
     }

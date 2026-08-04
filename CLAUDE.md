@@ -33,14 +33,15 @@ Run a single test file:
 pnpm --filter @velata/core exec vitest run src/client.test.ts
 ```
 
-Rust checks (CI runs both; clippy warnings fail the build):
+Rust checks (CI runs all three; clippy warnings fail the build):
 
 ```sh
 cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
-CI (`.github/workflows/ci.yml`, macos runner) requires all of: typecheck, lint, format check, test, build, `cargo fmt --check`, clippy. All must be green.
+CI (`.github/workflows/ci.yml`, macos runner) requires all of: typecheck, lint, format check, test, build, `cargo fmt --check`, Rust test, clippy. All must be green.
 
 `pnpm-workspace.yaml` sets `minimumReleaseAge: 1440` — packages published less than 24h ago will not resolve.
 

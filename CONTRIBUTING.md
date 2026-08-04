@@ -38,6 +38,7 @@ pnpm format         # prettier --check .   (format:write to fix)
 pnpm test           # vitest (packages/core and apps/desktop)
 pnpm build          # tsc --noEmit + vite build
 cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 

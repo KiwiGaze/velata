@@ -6,6 +6,7 @@ import { act, createElement, type ReactElement, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { previewCopyText } from "../lib/live-preview-scheduler";
 import { type LivePreview, type LivePreviewInputs, useLivePreview } from "./use-live-preview";
 import { type RefineFn } from "./use-refine";
 
@@ -84,7 +85,7 @@ describe("useLivePreview", () => {
     vi.unstubAllGlobals();
   });
 
-  it("cancels old provider work and rejects its late result", async () => {
+  it("clears the previous provider result while the new provider refreshes", async () => {
     const openAiCalls: RecordedCall[] = [];
     const sparkCalls: RecordedCall[] = [];
     const openAiRefine = createRefine(openAiCalls);
@@ -120,12 +121,38 @@ describe("useLivePreview", () => {
     });
     expect(openAiCalls).toHaveLength(1);
 
+    await act(async () => {
+      openAiCalls[0]?.deferred.resolve("ready HTTP result");
+      await flush();
+    });
+    expect(states.at(-1)).toMatchObject({
+      text: "ready HTTP result",
+      phase: "ready",
+      draftKey: "d1",
+    });
+
+    act(() => {
+      states.at(-1)?.refreshNow();
+    });
+    expect(openAiCalls).toHaveLength(2);
+    expect(states.at(-1)).toMatchObject({
+      text: "ready HTTP result",
+      phase: "refreshing",
+      draftKey: "d1",
+    });
+
     render("codex-spark", sparkRefine);
-    expect(openAiCalls[0]?.signal.aborted).toBe(true);
+    expect(openAiCalls[1]?.signal.aborted).toBe(true);
     expect(sparkCalls).toHaveLength(1);
+    const refreshingState = states.at(-1);
+    expect(refreshingState).toMatchObject({ text: "", phase: "refreshing", draftKey: "d1" });
+    if (refreshingState === undefined) {
+      throw new Error("Provider refresh did not publish preview state");
+    }
+    expect(previewCopyText(refreshingState, "same draft")).toBe("same draft");
 
     await act(async () => {
-      openAiCalls[0]?.deferred.resolve("stale HTTP result");
+      openAiCalls[1]?.deferred.resolve("stale HTTP result");
       await flush();
     });
     expect(states.at(-1)).toMatchObject({ text: "", phase: "refreshing", draftKey: "d1" });

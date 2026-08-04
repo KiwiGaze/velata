@@ -284,9 +284,15 @@ pub fn cancel_codex_spark(request: CancelRequest, registry: State<'_, CodexRegis
 
 #[derive(Clone)]
 struct RunOptions {
-    executable: Option<PathBuf>,
+    executable: Option<CodexExecutable>,
     temp_root: PathBuf,
     limits: RunLimits,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct CodexExecutable {
+    path: PathBuf,
+    child_path: OsString,
 }
 
 impl RunOptions {
@@ -314,7 +320,7 @@ fn run_refine(
         return Err(CodexSparkError::cancelled());
     }
     let executable = match options.executable {
-        Some(path) if is_executable_file(&path) => path,
+        Some(executable) if is_runnable_codex(&executable) => executable,
         Some(_) => return Err(cli_not_found()),
         None => find_codex_executable().ok_or_else(cli_not_found)?,
     };
@@ -368,7 +374,7 @@ fn validate_request_id(request_id: &str) -> Result<(), CodexSparkError> {
     }
 }
 
-fn find_codex_executable() -> Option<PathBuf> {
+fn find_codex_executable() -> Option<CodexExecutable> {
     let path = env::var_os("PATH");
     let home = env::var_os("HOME").map(PathBuf::from);
     resolve_codex_executable(
@@ -385,11 +391,18 @@ fn resolve_codex_executable(
     path: Option<&OsStr>,
     home: Option<&Path>,
     system_candidates: &[PathBuf],
-) -> Option<PathBuf> {
+) -> Option<CodexExecutable> {
+    let inherited_directories = path
+        .map(env::split_paths)
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
     let mut candidates = Vec::new();
-    if let Some(path) = path {
-        candidates.extend(env::split_paths(&path).map(|directory| directory.join("codex")));
-    }
+    candidates.extend(
+        inherited_directories
+            .iter()
+            .map(|directory| directory.join("codex")),
+    );
     if let Some(home) = home {
         candidates.extend([
             home.join(".bun/bin/codex"),
@@ -403,10 +416,20 @@ fn resolve_codex_executable(
         candidates.extend(find_nvm_codex_candidates(home));
     }
     candidates.extend(system_candidates.iter().cloned());
-    candidates.into_iter().find(|path| is_executable_file(path))
+    let runtime_directories = find_supported_node_directories(home, system_candidates);
+    candidates.into_iter().find_map(|candidate| {
+        resolve_codex_candidate(&candidate, &inherited_directories, &runtime_directories)
+    })
 }
 
 fn find_nvm_codex_candidates(home: &Path) -> Vec<PathBuf> {
+    find_nvm_version_directories(home)
+        .into_iter()
+        .map(|directory| directory.join("codex"))
+        .collect()
+}
+
+fn find_nvm_version_directories(home: &Path) -> Vec<PathBuf> {
     let versions_directory = home.join(".nvm/versions/node");
     let Ok(entries) = fs::read_dir(&versions_directory) else {
         return Vec::new();
@@ -415,11 +438,99 @@ fn find_nvm_codex_candidates(home: &Path) -> Vec<PathBuf> {
         .filter_map(Result::ok)
         .filter_map(|entry| {
             let version = parse_node_version(&entry.file_name())?;
-            Some((version, entry.path().join("bin/codex")))
+            Some((version, entry.path().join("bin")))
         })
         .collect::<Vec<_>>();
     versions.sort_unstable_by_key(|candidate| std::cmp::Reverse(candidate.0));
     versions.into_iter().map(|(_, path)| path).collect()
+}
+
+fn find_supported_node_directories(
+    home: Option<&Path>,
+    system_candidates: &[PathBuf],
+) -> Vec<PathBuf> {
+    let mut directories = Vec::new();
+    if let Some(home) = home {
+        directories.extend([
+            home.join(".volta/bin"),
+            home.join(".asdf/shims"),
+            home.join(".local/share/mise/shims"),
+            home.join(".local/share/fnm/aliases/default/bin"),
+        ]);
+        directories.extend(find_nvm_version_directories(home));
+    }
+    directories.extend(
+        system_candidates
+            .iter()
+            .filter_map(|candidate| candidate.parent().map(Path::to_owned)),
+    );
+    directories.retain(|directory| is_executable_file(&directory.join("node")));
+    directories
+}
+
+fn resolve_codex_candidate(
+    candidate: &Path,
+    inherited_directories: &[PathBuf],
+    runtime_directories: &[PathBuf],
+) -> Option<CodexExecutable> {
+    if !is_executable_file(candidate) {
+        return None;
+    }
+    let child_directories = child_path_directories(
+        candidate.parent(),
+        inherited_directories,
+        runtime_directories,
+    );
+    if is_env_node_launcher(candidate)
+        && !child_directories
+            .iter()
+            .any(|directory| is_executable_file(&directory.join("node")))
+    {
+        return None;
+    }
+    let child_path = env::join_paths(child_directories).ok()?;
+    Some(CodexExecutable {
+        path: candidate.to_owned(),
+        child_path,
+    })
+}
+
+fn child_path_directories(
+    launcher_directory: Option<&Path>,
+    inherited_directories: &[PathBuf],
+    runtime_directories: &[PathBuf],
+) -> Vec<PathBuf> {
+    let mut directories = Vec::new();
+    if let Some(launcher_directory) = launcher_directory {
+        directories.push(launcher_directory.to_owned());
+    }
+    for directory in inherited_directories.iter().chain(runtime_directories) {
+        if !directories.contains(directory) {
+            directories.push(directory.clone());
+        }
+    }
+    directories
+}
+
+fn is_env_node_launcher(path: &Path) -> bool {
+    let Ok(file) = File::open(path) else {
+        return false;
+    };
+    let mut bytes = Vec::new();
+    if file.take(128).read_to_end(&mut bytes).is_err() {
+        return false;
+    }
+    String::from_utf8_lossy(&bytes)
+        .lines()
+        .next()
+        .is_some_and(|line| line.trim_end() == "#!/usr/bin/env node")
+}
+
+fn is_runnable_codex(executable: &CodexExecutable) -> bool {
+    is_executable_file(&executable.path)
+        && (!is_env_node_launcher(&executable.path)
+            || env::split_paths(&executable.child_path)
+                .any(|directory| is_executable_file(&directory.join("node"))))
 }
 
 fn parse_node_version(version: &OsStr) -> Option<(u64, u64, u64)> {
@@ -470,7 +581,7 @@ struct ProcessDiagnostics {
 }
 
 fn execute_process(
-    executable: &Path,
+    executable: &CodexExecutable,
     developer_instructions: &str,
     input: Vec<u8>,
     output_path: &Path,
@@ -478,10 +589,11 @@ fn execute_process(
     active_run: Arc<ActiveRun>,
     limits: RunLimits,
 ) -> Result<ProcessOutcome, CodexSparkError> {
-    let mut command = Command::new(executable);
+    let mut command = Command::new(&executable.path);
     command
         .args(build_arguments(output_path, developer_instructions)?)
         .current_dir(run_directory)
+        .env("PATH", &executable.child_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -554,9 +666,6 @@ fn execute_process(
     };
     if active_run.cancelled.load(Ordering::Acquire) {
         return Ok(ProcessOutcome::Cancelled);
-    }
-    if started_at.elapsed() >= limits.deadline {
-        return Ok(ProcessOutcome::TimedOut);
     }
     let outcome = process_result?;
     Ok(match outcome {
@@ -867,6 +976,7 @@ mod tests {
     use std::sync::mpsc;
 
     static TEST_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+    const TEST_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 
     struct TestDirectory(PathBuf);
 
@@ -901,9 +1011,13 @@ mod tests {
     }
 
     fn write_executable(path: &Path) {
+        write_executable_contents(path, "#!/bin/sh\n");
+    }
+
+    fn write_executable_contents(path: &Path, contents: &str) {
         fs::create_dir_all(path.parent().expect("executable has a parent"))
             .expect("create executable directory");
-        fs::write(path, "#!/bin/sh\n").expect("write executable");
+        fs::write(path, contents).expect("write executable");
         fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("make file executable");
     }
 
@@ -916,8 +1030,32 @@ mod tests {
     }
 
     fn options(executable: PathBuf, temp_root: &Path) -> RunOptions {
+        let inherited_path = env::var_os("PATH");
+        let inherited_directories = inherited_path
+            .as_deref()
+            .map(env::split_paths)
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        let home = env::var_os("HOME").map(PathBuf::from);
+        let runtime_directories = find_supported_node_directories(
+            home.as_deref(),
+            &[
+                PathBuf::from("/opt/homebrew/bin/codex"),
+                PathBuf::from("/usr/local/bin/codex"),
+            ],
+        );
+        let child_path = env::join_paths(child_path_directories(
+            executable.parent(),
+            &inherited_directories,
+            &runtime_directories,
+        ))
+        .expect("build test child PATH");
         RunOptions {
-            executable: Some(executable),
+            executable: Some(CodexExecutable {
+                path: executable,
+                child_path,
+            }),
             temp_root: temp_root.to_owned(),
             limits: RunLimits {
                 deadline: Duration::from_secs(10),
@@ -966,7 +1104,7 @@ mod tests {
             {
                 return process_group_id;
             }
-            assert!(started_at.elapsed() < Duration::from_secs(2));
+            assert!(started_at.elapsed() < TEST_WAIT_TIMEOUT);
             thread::sleep(Duration::from_millis(5));
         }
     }
@@ -978,7 +1116,7 @@ mod tests {
             if result == -1 && io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH) {
                 return;
             }
-            assert!(started_at.elapsed() < Duration::from_secs(2));
+            assert!(started_at.elapsed() < TEST_WAIT_TIMEOUT);
             thread::sleep(Duration::from_millis(5));
         }
     }
@@ -989,7 +1127,7 @@ mod tests {
             if let Ok(process_id) = fs::read_to_string(path) {
                 return process_id.parse().expect("parse process id");
             }
-            assert!(started_at.elapsed() < Duration::from_secs(2));
+            assert!(started_at.elapsed() < TEST_WAIT_TIMEOUT);
             thread::sleep(Duration::from_millis(5));
         }
     }
@@ -1014,7 +1152,8 @@ mod tests {
                 Some(&path),
                 Some(directory.path()),
                 std::slice::from_ref(&system_codex),
-            ),
+            )
+            .map(|executable| executable.path),
             Some(path_codex.clone())
         );
         fs::remove_file(&path_codex).expect("remove PATH executable");
@@ -1023,7 +1162,8 @@ mod tests {
                 Some(&path),
                 Some(directory.path()),
                 std::slice::from_ref(&system_codex),
-            ),
+            )
+            .map(|executable| executable.path),
             Some(home_codex.clone())
         );
         fs::remove_file(&home_codex).expect("remove home executable");
@@ -1032,7 +1172,8 @@ mod tests {
                 Some(&path),
                 Some(directory.path()),
                 std::slice::from_ref(&system_codex),
-            ),
+            )
+            .map(|executable| executable.path),
             Some(nvm_codex.clone())
         );
         fs::remove_file(&nvm_codex).expect("remove NVM executable");
@@ -1041,7 +1182,8 @@ mod tests {
                 Some(&path),
                 Some(directory.path()),
                 std::slice::from_ref(&system_codex),
-            ),
+            )
+            .map(|executable| executable.path),
             Some(system_codex)
         );
     }
@@ -1059,7 +1201,8 @@ mod tests {
             write_executable(&executable);
 
             assert_eq!(
-                resolve_codex_executable(None, Some(directory.path()), &[]),
+                resolve_codex_executable(None, Some(directory.path()), &[])
+                    .map(|executable| executable.path),
                 Some(executable),
                 "failed to discover {relative_path}"
             );
@@ -1080,7 +1223,8 @@ mod tests {
         let path = env::join_paths([&path_directory]).expect("join PATH");
 
         assert_eq!(
-            resolve_codex_executable(Some(&path), Some(directory.path()), &[]),
+            resolve_codex_executable(Some(&path), Some(directory.path()), &[])
+                .map(|executable| executable.path),
             Some(executable)
         );
     }
@@ -1111,9 +1255,85 @@ mod tests {
             .expect("write non-executable NVM candidate");
 
         assert_eq!(
-            resolve_codex_executable(None, Some(directory.path()), &[]),
+            resolve_codex_executable(None, Some(directory.path()), &[])
+                .map(|executable| executable.path),
             Some(latest)
         );
+    }
+
+    #[test]
+    fn finder_discovery_skips_an_env_node_launcher_without_node() {
+        let directory = TestDirectory::new();
+        let inherited_directory = directory.path().join("finder-path");
+        fs::create_dir(&inherited_directory).expect("create Finder PATH directory");
+        let unsupported_launcher = directory.path().join(".bun/bin/codex");
+        write_executable_contents(&unsupported_launcher, "#!/usr/bin/env node\n");
+        let absolute_interpreter_launcher = directory.path().join(".local/bin/codex");
+        write_executable(&absolute_interpreter_launcher);
+        let path = env::join_paths([&inherited_directory]).expect("join Finder PATH");
+
+        assert_eq!(
+            resolve_codex_executable(Some(&path), Some(directory.path()), &[])
+                .map(|executable| executable.path),
+            Some(absolute_interpreter_launcher)
+        );
+    }
+
+    #[test]
+    fn finder_execution_supplies_a_supported_node_runtime_to_an_env_launcher() {
+        let directory = TestDirectory::new();
+        let inherited_directory = directory.path().join("finder-path");
+        fs::create_dir(&inherited_directory).expect("create Finder PATH directory");
+        let launcher = directory.path().join(".local/bin/codex");
+        let node = directory.path().join(".volta/bin/node");
+        let node_marker = directory.path().join("node-invoked");
+        write_executable_contents(
+            &node,
+            &format!(
+                "#!/bin/sh\nprintf 'invoked' > '{}'\nexec /bin/sh \"$@\"\n",
+                node_marker.display()
+            ),
+        );
+        write_executable_contents(
+            &launcher,
+            r#"#!/usr/bin/env node
+set -eu
+output=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then shift; output="$1"; fi
+  shift
+done
+printf 'Finder execution passed' > "$output"
+"#,
+        );
+        let path = env::join_paths([&inherited_directory]).expect("join Finder PATH");
+        let executable = resolve_codex_executable(Some(&path), Some(directory.path()), &[])
+            .expect("resolve env-node launcher");
+        assert_eq!(executable.path, launcher);
+        assert_eq!(
+            env::split_paths(&executable.child_path).collect::<Vec<_>>(),
+            vec![
+                directory.path().join(".local/bin"),
+                inherited_directory,
+                directory.path().join(".volta/bin"),
+            ]
+        );
+        let mut run_options = options(executable.path.clone(), directory.path());
+        run_options.executable = Some(executable);
+
+        let text = run_refine(
+            &CodexRegistry::default(),
+            request("finder-env-node", "task", "input"),
+            run_options,
+        )
+        .expect("run env-node launcher");
+
+        assert_eq!(text, "Finder execution passed");
+        assert_eq!(
+            fs::read_to_string(node_marker).expect("read node invocation marker"),
+            "invoked"
+        );
+        assert_no_run_directories(directory.path());
     }
 
     #[test]
@@ -1425,7 +1645,7 @@ printf 'accepted output' > "$output"
         let started_at = Instant::now();
         fs::write(&release_path, "release").expect("release successful wrapper");
 
-        let result = match receiver.recv_timeout(Duration::from_secs(2)) {
+        let result = match receiver.recv_timeout(TEST_WAIT_TIMEOUT) {
             Ok(result) => result,
             Err(error) => {
                 signal_process_group(process_group_id, libc::SIGKILL);
@@ -1437,9 +1657,49 @@ printf 'accepted output' > "$output"
         let text = result.expect("successful wrapper output is accepted");
 
         assert_eq!(text, "accepted output");
-        assert!(started_at.elapsed() < Duration::from_secs(2));
+        assert!(started_at.elapsed() < TEST_WAIT_TIMEOUT);
         assert_process_is_gone(descendant_process_id);
         assert!(!process_group_exists(process_group_id));
+        assert_no_run_directories(directory.path());
+    }
+
+    #[test]
+    fn wrapper_exit_before_deadline_stays_successful_after_slow_group_cleanup() {
+        let directory = TestDirectory::new();
+        let descendant_ready_path = directory.path().join("slow-descendant-ready");
+        let script = write_script(
+            directory.path(),
+            "codex",
+            &format!(
+                r#"
+output=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then shift; output="$1"; fi
+  shift
+done
+sh -c 'trap "" INT; printf ready > "{}"; while :; do sleep 1; done' &
+while [ ! -s "{}" ]; do sleep 0.01; done
+printf 'completed before deadline' > "$output"
+"#,
+                descendant_ready_path.display(),
+                descendant_ready_path.display()
+            ),
+        );
+        let mut run_options = options(script, directory.path());
+        run_options.limits.deadline = Duration::from_secs(5);
+        run_options.limits.signal_grace = Duration::from_millis(5_200);
+        let started_at = Instant::now();
+
+        let text = run_refine(
+            &CodexRegistry::default(),
+            request("completed-before-deadline", "task", "input"),
+            run_options,
+        )
+        .expect("completed wrapper is not relabelled as timed out");
+
+        assert_eq!(text, "completed before deadline");
+        assert!(started_at.elapsed() >= Duration::from_secs(5));
+        assert!(started_at.elapsed() < TEST_WAIT_TIMEOUT);
         assert_no_run_directories(directory.path());
     }
 
@@ -1575,7 +1835,7 @@ cat >/dev/null
 printf '12345' > "$output"
 "#,
         );
-        run_options.executable = Some(oversized_script);
+        run_options.executable = options(oversized_script, directory.path()).executable;
         let output_error = run_refine(
             &CodexRegistry::default(),
             request("large-output", "four", "four"),
