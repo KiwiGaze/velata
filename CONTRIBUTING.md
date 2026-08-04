@@ -35,7 +35,7 @@ Run everything from the repo root:
 pnpm typecheck      # tsc across all workspaces
 pnpm lint           # eslint over the whole workspace
 pnpm format         # prettier --check .   (format:write to fix)
-pnpm test           # vitest (packages/core)
+pnpm test           # vitest (packages/core and apps/desktop)
 pnpm build          # tsc --noEmit + vite build
 cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
 cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
@@ -45,6 +45,7 @@ Run a single test file:
 
 ```sh
 pnpm --filter @velata/core exec vitest run src/client.test.ts
+pnpm --filter velata-desktop exec vitest run src/hooks/use-live-preview.test.ts
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of the above on a macOS runner. Every check must pass before a PR can merge. Please run them locally first.

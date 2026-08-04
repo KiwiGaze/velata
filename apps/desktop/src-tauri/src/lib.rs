@@ -248,7 +248,6 @@ pub fn run() {
                         let _ = show_settings(app);
                     }
                     "quit-velata" => {
-                        codex::shutdown_codex(&app.state::<codex::CodexRegistry>());
                         app.exit(0);
                     }
                     _ => {}
@@ -257,6 +256,11 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
+                codex::shutdown_codex(&app.state::<codex::CodexRegistry>());
+            }
+        });
 }

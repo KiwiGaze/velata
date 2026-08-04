@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
-  buildCodexTaskPrompt,
+  buildSystemPrompt,
   type ConnectionResult,
   DEFAULT_INSTRUCTION,
   type Instruction,
@@ -10,6 +10,16 @@ import { CodexSparkError, normalizeCodexSparkError } from "@/lib/refine-errors";
 
 interface RefineResponse {
   readonly text: string;
+}
+
+const CODEX_DEVELOPER_INSTRUCTION_SUFFIX = `Process only the draft provided through stdin.
+Do not use tools, run commands, read files, or use outside context.
+Return only the final text. Do not include a preamble, quotation wrapper, explanation, reasoning, or source fence.
+When formatting is needed, use only Velata-supported Markdown: paragraphs; headings where the selected instruction permits them; bold; italic; inline code; fenced code; blockquotes; bulleted lists; numbered lists; and links.
+Use no tables, images, HTML, task-list syntax, or hard breaks.`;
+
+function buildCodexDeveloperInstructions(instruction: Instruction): string {
+  return `${buildSystemPrompt(instruction)}\n\n${CODEX_DEVELOPER_INSTRUCTION_SUFFIX}`;
 }
 
 function createAbortError(): DOMException {
@@ -67,7 +77,7 @@ export async function refineWithCodexSpark(
     const response = await invoke<unknown>("refine_with_codex_spark", {
       request: {
         requestId,
-        taskPrompt: buildCodexTaskPrompt(instruction),
+        developerInstructions: buildCodexDeveloperInstructions(instruction),
         input,
       },
     });

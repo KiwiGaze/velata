@@ -14,6 +14,7 @@ export interface LivePreviewInputs {
   source: string;
   draftId: string;
   instruction: Instruction;
+  provider: string;
   refine: RefineFn;
 }
 
@@ -27,6 +28,7 @@ interface TrackedInputs {
   instructionId: string;
   targetLanguage: string;
   prompt: string;
+  provider: string;
 }
 
 function sameInstruction(tracked: TrackedInputs, instruction: Instruction): boolean {
@@ -39,12 +41,12 @@ function sameInstruction(tracked: TrackedInputs, instruction: Instruction): bool
 
 /**
  * Binds the live-preview scheduler to React state. Draft changes reset the
- * preview, instruction changes refresh immediately, source changes debounce;
- * the injected refine is read through a ref so Settings edits (model / base
- * URL) take effect without recreating the scheduler.
+ * preview, provider and instruction changes refresh immediately, source
+ * changes debounce; the injected refine is read through a ref so Settings
+ * edits take effect without recreating the scheduler.
  */
 export function useLivePreview(inputs: LivePreviewInputs): LivePreview {
-  const { enabled, source, draftId, instruction, refine } = inputs;
+  const { enabled, source, draftId, instruction, provider, refine } = inputs;
   const [state, setState] = useState<PreviewState>({ text: "", phase: "idle", draftKey: "" });
   const refineRef = useRef<RefineFn>(refine);
   const schedulerRef = useRef<LivePreviewScheduler | null>(null);
@@ -72,10 +74,15 @@ export function useLivePreview(inputs: LivePreviewInputs): LivePreview {
       instructionId: instruction.id,
       targetLanguage: instruction.targetLanguage,
       prompt: instruction.prompt,
+      provider,
     };
     if (tracked?.draftId !== draftId) {
       scheduler.reset(draftId);
       scheduler.schedule(source, instruction, draftId);
+      return;
+    }
+    if (tracked.provider !== provider) {
+      scheduler.refreshNow(source, instruction, draftId);
       return;
     }
     if (!sameInstruction(tracked, instruction)) {
@@ -83,7 +90,7 @@ export function useLivePreview(inputs: LivePreviewInputs): LivePreview {
       return;
     }
     scheduler.schedule(source, instruction, draftId);
-  }, [scheduler, enabled, source, draftId, instruction]);
+  }, [scheduler, enabled, source, draftId, instruction, provider]);
 
   useEffect(() => {
     return () => {

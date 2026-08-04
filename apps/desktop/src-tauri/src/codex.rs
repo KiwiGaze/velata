@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::env;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 const CODEX_MODEL: &str = "gpt-5.3-codex-spark";
+const CODEX_USER_PROMPT: &str = "Refine the draft provided through stdin.";
 const TOMBSTONE_TTL: Duration = Duration::from_secs(60);
 const MAX_TOMBSTONES: usize = 256;
 const MAX_REQUEST_ID_BYTES: usize = 128;
@@ -26,7 +27,7 @@ struct RunLimits {
     deadline: Duration,
     signal_grace: Duration,
     poll_interval: Duration,
-    max_task_prompt_bytes: usize,
+    max_developer_instructions_bytes: usize,
     max_input_bytes: usize,
     max_output_bytes: usize,
     max_diagnostic_bytes: usize,
@@ -38,7 +39,7 @@ impl Default for RunLimits {
             deadline: Duration::from_secs(30),
             signal_grace: Duration::from_secs(1),
             poll_interval: Duration::from_millis(25),
-            max_task_prompt_bytes: 64 * 1024,
+            max_developer_instructions_bytes: 64 * 1024,
             max_input_bytes: 4 * 1024 * 1024,
             max_output_bytes: 1024 * 1024,
             max_diagnostic_bytes: 64 * 1024,
@@ -50,7 +51,7 @@ impl Default for RunLimits {
 #[serde(rename_all = "camelCase")]
 pub struct RefineRequest {
     request_id: String,
-    task_prompt: String,
+    developer_instructions: String,
     input: String,
 }
 
@@ -323,9 +324,10 @@ fn run_refine(
     let output_path = run_directory.0.join("final-message.md");
     let outcome = execute_process(
         &executable,
-        &request.task_prompt,
+        &request.developer_instructions,
         request.input.into_bytes(),
         &output_path,
+        &run_directory.0,
         Arc::clone(&active_run),
         options.limits,
     );
@@ -343,7 +345,7 @@ fn run_refine(
 
 fn validate_request(request: &RefineRequest, limits: RunLimits) -> Result<(), CodexSparkError> {
     validate_request_id(&request.request_id)?;
-    if request.task_prompt.len() > limits.max_task_prompt_bytes {
+    if request.developer_instructions.len() > limits.max_developer_instructions_bytes {
         return Err(CodexSparkError::new(
             CodexSparkErrorCode::TaskPromptTooLarge,
             "Refine instruction is too large.",
@@ -367,23 +369,68 @@ fn validate_request_id(request_id: &str) -> Result<(), CodexSparkError> {
 }
 
 fn find_codex_executable() -> Option<PathBuf> {
+    let path = env::var_os("PATH");
+    let home = env::var_os("HOME").map(PathBuf::from);
+    resolve_codex_executable(
+        path.as_deref(),
+        home.as_deref(),
+        &[
+            PathBuf::from("/opt/homebrew/bin/codex"),
+            PathBuf::from("/usr/local/bin/codex"),
+        ],
+    )
+}
+
+fn resolve_codex_executable(
+    path: Option<&OsStr>,
+    home: Option<&Path>,
+    system_candidates: &[PathBuf],
+) -> Option<PathBuf> {
     let mut candidates = Vec::new();
-    if let Some(path) = env::var_os("PATH") {
+    if let Some(path) = path {
         candidates.extend(env::split_paths(&path).map(|directory| directory.join("codex")));
     }
-    if let Some(home) = env::var_os("HOME") {
-        let home = PathBuf::from(home);
+    if let Some(home) = home {
         candidates.extend([
             home.join(".bun/bin/codex"),
             home.join(".local/bin/codex"),
             home.join(".npm-global/bin/codex"),
+            home.join(".volta/bin/codex"),
+            home.join(".asdf/shims/codex"),
+            home.join(".local/share/mise/shims/codex"),
+            home.join(".local/share/fnm/aliases/default/bin/codex"),
         ]);
+        candidates.extend(find_nvm_codex_candidates(home));
     }
-    candidates.extend([
-        PathBuf::from("/opt/homebrew/bin/codex"),
-        PathBuf::from("/usr/local/bin/codex"),
-    ]);
+    candidates.extend(system_candidates.iter().cloned());
     candidates.into_iter().find(|path| is_executable_file(path))
+}
+
+fn find_nvm_codex_candidates(home: &Path) -> Vec<PathBuf> {
+    let versions_directory = home.join(".nvm/versions/node");
+    let Ok(entries) = fs::read_dir(&versions_directory) else {
+        return Vec::new();
+    };
+    let mut versions = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let version = parse_node_version(&entry.file_name())?;
+            Some((version, entry.path().join("bin/codex")))
+        })
+        .collect::<Vec<_>>();
+    versions.sort_unstable_by_key(|candidate| std::cmp::Reverse(candidate.0));
+    versions.into_iter().map(|(_, path)| path).collect()
+}
+
+fn parse_node_version(version: &OsStr) -> Option<(u64, u64, u64)> {
+    let version = version.to_str()?.strip_prefix('v')?;
+    let mut parts = version.split('.');
+    let parsed = (
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    );
+    parts.next().is_none().then_some(parsed)
 }
 
 fn is_executable_file(path: &Path) -> bool {
@@ -424,15 +471,17 @@ struct ProcessDiagnostics {
 
 fn execute_process(
     executable: &Path,
-    task_prompt: &str,
+    developer_instructions: &str,
     input: Vec<u8>,
     output_path: &Path,
+    run_directory: &Path,
     active_run: Arc<ActiveRun>,
     limits: RunLimits,
 ) -> Result<ProcessOutcome, CodexSparkError> {
     let mut command = Command::new(executable);
     command
-        .args(build_arguments(output_path, task_prompt))
+        .args(build_arguments(output_path, developer_instructions)?)
+        .current_dir(run_directory)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -461,59 +510,71 @@ fn execute_process(
     let stdout = Arc::new(Mutex::new(Vec::new()));
     let stderr = Arc::new(Mutex::new(Vec::new()));
     let stdout_thread = spawn_drain(
-        child.stdout.take().ok_or_else(execution_failed)?,
+        child.stdout.take().expect("stdout is configured as piped"),
         Arc::clone(&stdout),
         limits.max_diagnostic_bytes,
     );
     let stderr_thread = spawn_drain(
-        child.stderr.take().ok_or_else(execution_failed)?,
+        child.stderr.take().expect("stderr is configured as piped"),
         Arc::clone(&stderr),
         limits.max_diagnostic_bytes,
     );
-    let stdin_thread = child.stdin.take().map(|mut stdin| {
-        thread::spawn(move || {
-            let _ = stdin.write_all(&input);
-        })
+    let mut stdin = child.stdin.take().expect("stdin is configured as piped");
+    let stdin_thread = thread::spawn(move || {
+        let _ = stdin.write_all(&input);
     });
 
     let started_at = Instant::now();
-    let outcome = loop {
+    let mut is_wrapper_reaped = false;
+    let process_result = loop {
         if active_run.cancelled.load(Ordering::Acquire) {
-            stop_process(&mut child, process_group_id, limits);
-            break ProcessOutcome::Cancelled;
+            break Ok(ProcessOutcome::Cancelled);
         }
         if started_at.elapsed() >= limits.deadline {
-            stop_process(&mut child, process_group_id, limits);
-            break ProcessOutcome::TimedOut;
+            break Ok(ProcessOutcome::TimedOut);
         }
         match child.try_wait() {
             Ok(Some(status)) => {
-                break ProcessOutcome::Exited(status, ProcessDiagnostics::default());
+                is_wrapper_reaped = true;
+                break Ok(ProcessOutcome::Exited(
+                    status,
+                    ProcessDiagnostics::default(),
+                ));
             }
             Ok(None) => thread::sleep(limits.poll_interval),
-            Err(_) => {
-                stop_process(&mut child, process_group_id, limits);
-                join_io_threads(stdin_thread, stdout_thread, stderr_thread);
-                return Err(execution_failed());
-            }
+            Err(_) => break Err(execution_failed()),
         }
     };
-    join_io_threads(stdin_thread, stdout_thread, stderr_thread);
+    cleanup_process_group(&mut child, process_group_id, is_wrapper_reaped, limits);
     *lock_unpoisoned(&active_run.process_group_id) = None;
+    join_io_threads(stdin_thread, stdout_thread, stderr_thread);
     let diagnostics = ProcessDiagnostics {
         stdout: lock_unpoisoned(&stdout).clone(),
         stderr: lock_unpoisoned(&stderr).clone(),
     };
+    if active_run.cancelled.load(Ordering::Acquire) {
+        return Ok(ProcessOutcome::Cancelled);
+    }
+    if started_at.elapsed() >= limits.deadline {
+        return Ok(ProcessOutcome::TimedOut);
+    }
+    let outcome = process_result?;
     Ok(match outcome {
         ProcessOutcome::Exited(status, _) => ProcessOutcome::Exited(status, diagnostics),
         other => other,
     })
 }
 
-fn build_arguments(output_path: &Path, task_prompt: &str) -> Vec<OsString> {
-    [
+fn build_arguments(
+    output_path: &Path,
+    developer_instructions: &str,
+) -> Result<Vec<OsString>, CodexSparkError> {
+    let developer_instructions =
+        serde_json::to_string(developer_instructions).map_err(|_| execution_failed())?;
+    Ok([
         OsString::from("exec"),
         OsString::from("--ephemeral"),
+        OsString::from("--strict-config"),
         OsString::from("--ignore-user-config"),
         OsString::from("--ignore-rules"),
         OsString::from("--sandbox"),
@@ -524,15 +585,69 @@ fn build_arguments(output_path: &Path, task_prompt: &str) -> Vec<OsString> {
         OsString::from("-c"),
         OsString::from("model_reasoning_effort=\"low\""),
         OsString::from("-c"),
+        OsString::from(format!("developer_instructions={developer_instructions}")),
+        OsString::from("-c"),
         OsString::from("approval_policy=\"never\""),
+        OsString::from("-c"),
+        OsString::from("web_search=\"disabled\""),
+        OsString::from("-c"),
+        OsString::from("project_doc_max_bytes=0"),
+        OsString::from("-c"),
+        OsString::from("agents.enabled=false"),
+        OsString::from("--disable"),
+        OsString::from("shell_tool"),
+        OsString::from("--disable"),
+        OsString::from("unified_exec"),
+        OsString::from("--disable"),
+        OsString::from("apps"),
+        OsString::from("--disable"),
+        OsString::from("plugins"),
+        OsString::from("--disable"),
+        OsString::from("remote_plugin"),
+        OsString::from("--disable"),
+        OsString::from("multi_agent"),
+        OsString::from("--disable"),
+        OsString::from("multi_agent_v2"),
+        OsString::from("--disable"),
+        OsString::from("browser_use"),
+        OsString::from("--disable"),
+        OsString::from("browser_use_external"),
+        OsString::from("--disable"),
+        OsString::from("browser_use_full_cdp_access"),
+        OsString::from("--disable"),
+        OsString::from("computer_use"),
+        OsString::from("--disable"),
+        OsString::from("image_generation"),
+        OsString::from("--disable"),
+        OsString::from("in_app_browser"),
+        OsString::from("--disable"),
+        OsString::from("goals"),
+        OsString::from("--disable"),
+        OsString::from("hooks"),
+        OsString::from("--disable"),
+        OsString::from("shell_snapshot"),
+        OsString::from("--disable"),
+        OsString::from("memories"),
+        OsString::from("--disable"),
+        OsString::from("skill_mcp_dependency_install"),
+        OsString::from("--disable"),
+        OsString::from("workspace_dependencies"),
+        OsString::from("--disable"),
+        OsString::from("code_mode_host"),
+        OsString::from("--disable"),
+        OsString::from("auth_elicitation"),
+        OsString::from("--disable"),
+        OsString::from("tool_call_mcp_elicitation"),
+        OsString::from("--disable"),
+        OsString::from("tool_suggest"),
         OsString::from("--color"),
         OsString::from("never"),
         OsString::from("--output-last-message"),
         output_path.as_os_str().to_owned(),
-        OsString::from(task_prompt),
+        OsString::from(CODEX_USER_PROMPT),
     ]
     .into_iter()
-    .collect()
+    .collect())
 }
 
 fn spawn_drain(
@@ -557,21 +672,23 @@ fn spawn_drain(
 }
 
 fn join_io_threads(
-    stdin_thread: Option<thread::JoinHandle<()>>,
+    stdin_thread: thread::JoinHandle<()>,
     stdout_thread: thread::JoinHandle<()>,
     stderr_thread: thread::JoinHandle<()>,
 ) {
-    if let Some(stdin_thread) = stdin_thread {
-        let _ = stdin_thread.join();
-    }
+    let _ = stdin_thread.join();
     let _ = stdout_thread.join();
     let _ = stderr_thread.join();
 }
 
-fn stop_process(child: &mut Child, process_group_id: i32, limits: RunLimits) {
+fn cleanup_process_group(
+    child: &mut Child,
+    process_group_id: i32,
+    mut is_wrapper_reaped: bool,
+    limits: RunLimits,
+) {
     signal_process_group(process_group_id, libc::SIGINT);
     let grace_started_at = Instant::now();
-    let mut is_wrapper_reaped = false;
     while grace_started_at.elapsed() < limits.signal_grace {
         if !is_wrapper_reaped {
             match child.try_wait() {
@@ -626,16 +743,13 @@ fn read_final_output(path: &Path, max_bytes: usize) -> Result<String, CodexSpark
             "Could not read the refined output.",
         )
     })?;
-    if file
-        .metadata()
-        .map(|metadata| metadata.len())
-        .unwrap_or(u64::MAX)
-        > max_bytes as u64
-    {
-        return Err(CodexSparkError::new(
-            CodexSparkErrorCode::OutputTooLarge,
-            "Codex response is too large.",
-        ));
+    if let Ok(metadata) = file.metadata() {
+        if metadata.len() > max_bytes as u64 {
+            return Err(CodexSparkError::new(
+                CodexSparkErrorCode::OutputTooLarge,
+                "Codex response is too large.",
+            ));
+        }
     }
     let mut bytes = Vec::new();
     file.take((max_bytes + 1) as u64)
@@ -750,6 +864,7 @@ fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+    use std::sync::mpsc;
 
     static TEST_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -785,10 +900,17 @@ mod tests {
         path
     }
 
-    fn request(request_id: &str, task_prompt: &str, input: &str) -> RefineRequest {
+    fn write_executable(path: &Path) {
+        fs::create_dir_all(path.parent().expect("executable has a parent"))
+            .expect("create executable directory");
+        fs::write(path, "#!/bin/sh\n").expect("write executable");
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).expect("make file executable");
+    }
+
+    fn request(request_id: &str, developer_instructions: &str, input: &str) -> RefineRequest {
         RefineRequest {
             request_id: request_id.to_owned(),
-            task_prompt: task_prompt.to_owned(),
+            developer_instructions: developer_instructions.to_owned(),
             input: input.to_owned(),
         }
     }
@@ -801,7 +923,7 @@ mod tests {
                 deadline: Duration::from_secs(10),
                 signal_grace: Duration::from_millis(40),
                 poll_interval: Duration::from_millis(5),
-                max_task_prompt_bytes: 1024,
+                max_developer_instructions_bytes: 1024,
                 max_input_bytes: 512 * 1024,
                 max_output_bytes: 1024,
                 max_diagnostic_bytes: 1024,
@@ -873,7 +995,220 @@ mod tests {
     }
 
     #[test]
-    fn command_keeps_the_prompt_in_argv_and_the_draft_on_stdin() {
+    fn finder_discovery_preserves_path_home_nvm_and_system_precedence() {
+        let directory = TestDirectory::new();
+        let path_directory = directory.path().join("path-bin");
+        let path_codex = path_directory.join("codex");
+        let home_codex = directory.path().join(".bun/bin/codex");
+        let nvm_codex = directory
+            .path()
+            .join(".nvm/versions/node/v24.12.0/bin/codex");
+        let system_codex = directory.path().join("system/codex");
+        for executable in [&path_codex, &home_codex, &nvm_codex, &system_codex] {
+            write_executable(executable);
+        }
+        let path = env::join_paths([&path_directory]).expect("join PATH");
+
+        assert_eq!(
+            resolve_codex_executable(
+                Some(&path),
+                Some(directory.path()),
+                std::slice::from_ref(&system_codex),
+            ),
+            Some(path_codex.clone())
+        );
+        fs::remove_file(&path_codex).expect("remove PATH executable");
+        assert_eq!(
+            resolve_codex_executable(
+                Some(&path),
+                Some(directory.path()),
+                std::slice::from_ref(&system_codex),
+            ),
+            Some(home_codex.clone())
+        );
+        fs::remove_file(&home_codex).expect("remove home executable");
+        assert_eq!(
+            resolve_codex_executable(
+                Some(&path),
+                Some(directory.path()),
+                std::slice::from_ref(&system_codex),
+            ),
+            Some(nvm_codex.clone())
+        );
+        fs::remove_file(&nvm_codex).expect("remove NVM executable");
+        assert_eq!(
+            resolve_codex_executable(
+                Some(&path),
+                Some(directory.path()),
+                std::slice::from_ref(&system_codex),
+            ),
+            Some(system_codex)
+        );
+    }
+
+    #[test]
+    fn finder_discovery_accepts_each_fixed_version_manager_layout() {
+        for relative_path in [
+            ".volta/bin/codex",
+            ".asdf/shims/codex",
+            ".local/share/mise/shims/codex",
+            ".local/share/fnm/aliases/default/bin/codex",
+        ] {
+            let directory = TestDirectory::new();
+            let executable = directory.path().join(relative_path);
+            write_executable(&executable);
+
+            assert_eq!(
+                resolve_codex_executable(None, Some(directory.path()), &[]),
+                Some(executable),
+                "failed to discover {relative_path}"
+            );
+        }
+    }
+
+    #[test]
+    fn finder_discovery_requires_an_executable_file() {
+        let directory = TestDirectory::new();
+        let path_directory = directory.path().join("path-bin");
+        fs::create_dir_all(path_directory.join("codex")).expect("create directory candidate");
+        let non_executable = directory.path().join(".bun/bin/codex");
+        fs::create_dir_all(non_executable.parent().expect("candidate has a parent"))
+            .expect("create non-executable directory");
+        fs::write(&non_executable, "not executable").expect("write non-executable candidate");
+        let executable = directory.path().join(".local/bin/codex");
+        write_executable(&executable);
+        let path = env::join_paths([&path_directory]).expect("join PATH");
+
+        assert_eq!(
+            resolve_codex_executable(Some(&path), Some(directory.path()), &[]),
+            Some(executable)
+        );
+    }
+
+    #[test]
+    fn finder_discovery_chooses_the_latest_executable_semantic_nvm_version() {
+        let directory = TestDirectory::new();
+        let older = directory
+            .path()
+            .join(".nvm/versions/node/v22.15.0/bin/codex");
+        let latest = directory
+            .path()
+            .join(".nvm/versions/node/v24.2.1/bin/codex");
+        let invalid = directory.path().join(".nvm/versions/node/latest/bin/codex");
+        let non_executable_newer = directory
+            .path()
+            .join(".nvm/versions/node/v25.0.0/bin/codex");
+        for executable in [&older, &latest, &invalid] {
+            write_executable(executable);
+        }
+        fs::create_dir_all(
+            non_executable_newer
+                .parent()
+                .expect("candidate has a parent"),
+        )
+        .expect("create non-executable NVM directory");
+        fs::write(&non_executable_newer, "not executable")
+            .expect("write non-executable NVM candidate");
+
+        assert_eq!(
+            resolve_codex_executable(None, Some(directory.path()), &[]),
+            Some(latest)
+        );
+    }
+
+    #[test]
+    fn command_arguments_are_strict_tool_free_and_ordered() {
+        let output_path = Path::new("/private/run/final-message.md");
+        let arguments = build_arguments(
+            output_path,
+            "Trusted \"instruction\".\nBackslash: \\\\; Unicode: 中文",
+        )
+        .expect("build command arguments");
+
+        assert_eq!(
+            arguments,
+            vec![
+                OsString::from("exec"),
+                OsString::from("--ephemeral"),
+                OsString::from("--strict-config"),
+                OsString::from("--ignore-user-config"),
+                OsString::from("--ignore-rules"),
+                OsString::from("--sandbox"),
+                OsString::from("read-only"),
+                OsString::from("--skip-git-repo-check"),
+                OsString::from("--model"),
+                OsString::from("gpt-5.3-codex-spark"),
+                OsString::from("-c"),
+                OsString::from("model_reasoning_effort=\"low\""),
+                OsString::from("-c"),
+                OsString::from(
+                    "developer_instructions=\"Trusted \\\"instruction\\\".\\nBackslash: \\\\\\\\; Unicode: 中文\"",
+                ),
+                OsString::from("-c"),
+                OsString::from("approval_policy=\"never\""),
+                OsString::from("-c"),
+                OsString::from("web_search=\"disabled\""),
+                OsString::from("-c"),
+                OsString::from("project_doc_max_bytes=0"),
+                OsString::from("-c"),
+                OsString::from("agents.enabled=false"),
+                OsString::from("--disable"),
+                OsString::from("shell_tool"),
+                OsString::from("--disable"),
+                OsString::from("unified_exec"),
+                OsString::from("--disable"),
+                OsString::from("apps"),
+                OsString::from("--disable"),
+                OsString::from("plugins"),
+                OsString::from("--disable"),
+                OsString::from("remote_plugin"),
+                OsString::from("--disable"),
+                OsString::from("multi_agent"),
+                OsString::from("--disable"),
+                OsString::from("multi_agent_v2"),
+                OsString::from("--disable"),
+                OsString::from("browser_use"),
+                OsString::from("--disable"),
+                OsString::from("browser_use_external"),
+                OsString::from("--disable"),
+                OsString::from("browser_use_full_cdp_access"),
+                OsString::from("--disable"),
+                OsString::from("computer_use"),
+                OsString::from("--disable"),
+                OsString::from("image_generation"),
+                OsString::from("--disable"),
+                OsString::from("in_app_browser"),
+                OsString::from("--disable"),
+                OsString::from("goals"),
+                OsString::from("--disable"),
+                OsString::from("hooks"),
+                OsString::from("--disable"),
+                OsString::from("shell_snapshot"),
+                OsString::from("--disable"),
+                OsString::from("memories"),
+                OsString::from("--disable"),
+                OsString::from("skill_mcp_dependency_install"),
+                OsString::from("--disable"),
+                OsString::from("workspace_dependencies"),
+                OsString::from("--disable"),
+                OsString::from("code_mode_host"),
+                OsString::from("--disable"),
+                OsString::from("auth_elicitation"),
+                OsString::from("--disable"),
+                OsString::from("tool_call_mcp_elicitation"),
+                OsString::from("--disable"),
+                OsString::from("tool_suggest"),
+                OsString::from("--color"),
+                OsString::from("never"),
+                OsString::from("--output-last-message"),
+                output_path.as_os_str().to_owned(),
+                OsString::from(CODEX_USER_PROMPT),
+            ]
+        );
+    }
+
+    #[test]
+    fn command_uses_a_fixed_prompt_and_keeps_the_hostile_draft_on_stdin() {
         let directory = TestDirectory::new();
         let script = write_script(
             directory.path(),
@@ -882,6 +1217,7 @@ mod tests {
 args_file="$(dirname "$0")/args"
 stdin_file="$(dirname "$0")/stdin"
 pgid_file="$(dirname "$0")/pgid"
+cwd_file="$(dirname "$0")/cwd"
 : > "$args_file"
 output=""
 while [ "$#" -gt 0 ]; do
@@ -893,6 +1229,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 cat > "$stdin_file"
+pwd > "$cwd_file"
 printf '%s' "$$" > "$pgid_file"
 printf 'progress, not output\n' >&1
 printf 'diagnostic, not output\n' >&2
@@ -905,26 +1242,82 @@ printf '  final **text**  \n' > "$output"
             &CodexRegistry::default(),
             script,
             directory.path(),
-            request("request-1", "TASK PROMPT", hostile_input),
+            request(
+                "request-1",
+                "Trusted \"instruction\".\nBackslash: \\\\; Unicode: 中文",
+                hostile_input,
+            ),
         )
         .expect("fake Codex run succeeds");
 
         assert_eq!(text, "final **text**");
         let arguments = fs::read_to_string(directory.path().join("args")).expect("read args");
-        assert!(arguments.contains("exec\n--ephemeral\n--ignore-user-config\n--ignore-rules"));
+        assert!(arguments
+            .contains("exec\n--ephemeral\n--strict-config\n--ignore-user-config\n--ignore-rules"));
         assert!(arguments.contains("--sandbox\nread-only"));
         assert!(arguments.contains("--model\ngpt-5.3-codex-spark"));
         assert!(arguments.contains("-c\nmodel_reasoning_effort=\"low\""));
+        assert!(arguments.contains(
+            "-c\ndeveloper_instructions=\"Trusted \\\"instruction\\\".\\nBackslash: \\\\\\\\; Unicode: 中文\""
+        ));
         assert!(arguments.contains("-c\napproval_policy=\"never\""));
+        assert!(arguments.contains("-c\nweb_search=\"disabled\""));
+        assert!(arguments.contains("-c\nproject_doc_max_bytes=0"));
+        assert!(arguments.contains("-c\nagents.enabled=false"));
+        for feature in [
+            "shell_tool",
+            "unified_exec",
+            "apps",
+            "plugins",
+            "remote_plugin",
+            "multi_agent",
+            "multi_agent_v2",
+            "browser_use",
+            "browser_use_external",
+            "browser_use_full_cdp_access",
+            "computer_use",
+            "image_generation",
+            "in_app_browser",
+            "goals",
+            "hooks",
+            "shell_snapshot",
+            "memories",
+            "skill_mcp_dependency_install",
+            "workspace_dependencies",
+            "code_mode_host",
+            "auth_elicitation",
+            "tool_call_mcp_elicitation",
+            "tool_suggest",
+        ] {
+            assert!(arguments.contains(&format!("--disable\n{feature}\n")));
+        }
         assert!(arguments.contains("--color\nnever"));
         assert!(arguments.contains("--output-last-message\n"));
-        assert!(arguments.ends_with("TASK PROMPT\n"));
+        assert!(arguments.ends_with(&format!("{CODEX_USER_PROMPT}\n")));
         assert!(!arguments.contains(hostile_input));
         assert!(!arguments.contains("--json"));
         assert_eq!(
             fs::read_to_string(directory.path().join("stdin")).expect("read stdin"),
             hostile_input
         );
+        let command_working_directory = PathBuf::from(
+            fs::read_to_string(directory.path().join("cwd"))
+                .expect("read command working directory")
+                .trim(),
+        );
+        let canonical_test_directory = directory
+            .path()
+            .canonicalize()
+            .expect("canonicalize test directory");
+        assert_eq!(
+            command_working_directory.parent(),
+            Some(canonical_test_directory.as_path())
+        );
+        assert!(command_working_directory
+            .file_name()
+            .expect("run directory has a name")
+            .to_string_lossy()
+            .starts_with("velata-codex-"));
         let child_process_group: i32 = fs::read_to_string(directory.path().join("pgid"))
             .expect("read process group")
             .trim()
@@ -981,6 +1374,72 @@ printf 'pipe pressure passed' > "$output"
         .expect("pipe pressure run succeeds");
 
         assert_eq!(text, "pipe pressure passed");
+        assert_no_run_directories(directory.path());
+    }
+
+    #[test]
+    fn successful_wrapper_cleans_up_stubborn_descendant_holding_pipes() {
+        let directory = TestDirectory::new();
+        let descendant_path = directory.path().join("descendant-pid");
+        let release_path = directory.path().join("release-wrapper");
+        let script = write_script(
+            directory.path(),
+            "codex",
+            &format!(
+                r#"
+output=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--output-last-message" ]; then shift; output="$1"; fi
+  shift
+done
+cat >/dev/null
+sh -c 'trap "" INT; printf "%s" "$$" > "{}"; while :; do sleep 1; done' &
+while [ ! -s "{}" ]; do sleep 0.01; done
+while [ ! -e "{}" ]; do sleep 0.01; done
+printf 'accepted output' > "$output"
+"#,
+                descendant_path.display(),
+                descendant_path.display(),
+                release_path.display()
+            ),
+        );
+        let mut run_options = options(script, directory.path());
+        run_options.limits.signal_grace = Duration::from_millis(40);
+        let registry = CodexRegistry::default();
+        let worker_registry = registry.clone();
+        let (sender, receiver) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            let result = run_refine(
+                &worker_registry,
+                request("successful-descendant", "task", "input"),
+                run_options,
+            );
+            let _ = sender.send(result);
+        });
+        let process_group_id = wait_for_process_group(&registry, "successful-descendant");
+        let descendant_process_id = wait_for_process_id(&descendant_path);
+        assert_eq!(
+            get_process_group_id(descendant_process_id),
+            Some(process_group_id)
+        );
+        let started_at = Instant::now();
+        fs::write(&release_path, "release").expect("release successful wrapper");
+
+        let result = match receiver.recv_timeout(Duration::from_secs(2)) {
+            Ok(result) => result,
+            Err(error) => {
+                signal_process_group(process_group_id, libc::SIGKILL);
+                let _ = worker.join();
+                panic!("successful wrapper cleanup did not return: {error}");
+            }
+        };
+        worker.join().expect("worker does not panic");
+        let text = result.expect("successful wrapper output is accepted");
+
+        assert_eq!(text, "accepted output");
+        assert!(started_at.elapsed() < Duration::from_secs(2));
+        assert_process_is_gone(descendant_process_id);
+        assert!(!process_group_exists(process_group_id));
         assert_no_run_directories(directory.path());
     }
 
@@ -1076,7 +1535,7 @@ printf 'four' > "$output"
 "#,
         );
         let mut run_options = options(boundary_script, directory.path());
-        run_options.limits.max_task_prompt_bytes = 4;
+        run_options.limits.max_developer_instructions_bytes = 4;
         run_options.limits.max_input_bytes = 4;
         run_options.limits.max_output_bytes = 4;
         assert_eq!(

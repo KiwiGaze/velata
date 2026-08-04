@@ -89,7 +89,10 @@ export function ScratchPad(): ReactElement {
   const preSplitWidthRef = useRef<number | null>(null);
   const splitSizeSessionRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const providerRef = useRef(settings.provider);
   const editorRef = useRef<EditorHandle | null>(null);
+
+  providerRef.current = settings.provider;
 
   const focusEditor = useCallback((): void => {
     requestAnimationFrame(() => {
@@ -120,6 +123,7 @@ export function ScratchPad(): ReactElement {
     source: activeText,
     draftId: activeId,
     instruction: previewInstruction,
+    provider: settings.provider,
     refine,
   });
 
@@ -138,6 +142,10 @@ export function ScratchPad(): ReactElement {
     abortRef.current = null;
     setPhase({ kind: "idle" });
   }, []);
+
+  useEffect(() => {
+    resetTransient();
+  }, [settings.provider, resetTransient]);
 
   const handleCreateDraft = useCallback((): void => {
     resetTransient();
@@ -214,13 +222,14 @@ export function ScratchPad(): ReactElement {
 
     const previous = activeText;
     const controller = new AbortController();
+    const provider = settings.provider;
     abortRef.current = controller;
     setPhase({ kind: "refining", previous });
 
     void (async () => {
       try {
         const result = await refine(chosen, target, controller.signal);
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || providerRef.current !== provider) {
           return;
         }
         if (hasSelection) {
@@ -231,7 +240,7 @@ export function ScratchPad(): ReactElement {
         setPhase({ kind: "refined", previous });
         focusEditor();
       } catch (error) {
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || providerRef.current !== provider) {
           return;
         }
         setPhase({ kind: "error", message: truncateError(describeRefineError(error)) });

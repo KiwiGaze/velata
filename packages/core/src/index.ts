@@ -15,6 +15,6 @@ export {
   STRUCTURE_REFINE_PROMPT,
   type TargetLanguage,
 } from "./instruction";
-export { buildCodexTaskPrompt, buildSystemPrompt } from "./prompt";
+export { buildSystemPrompt } from "./prompt";
 export { countWords, isBlank } from "./text";
 export { TRANSFORM_PRESETS } from "./transform-presets";
