@@ -20,10 +20,7 @@ export interface ScratchpadKeyHandlers {
  */
 export function useScratchpadKeys(handlers: ScratchpadKeyHandlers): void {
   const handlersRef = useRef(handlers);
-
-  useEffect(() => {
-    handlersRef.current = handlers;
-  }, [handlers]);
+  handlersRef.current = handlers;
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {

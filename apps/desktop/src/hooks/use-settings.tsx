@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -28,41 +29,59 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 export function SettingsProvider({ children }: { children: ReactNode }): ReactElement {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
+  const settingsRef = useRef<AppSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     let active = true;
     let unlisten: (() => void) | null = null;
-    void loadSettings().then((loaded) => {
-      if (active) {
-        setSettings(loaded);
+    let broadcastApplied = false;
+    void loadSettings()
+      .then((loaded) => {
+        if (!active) {
+          return;
+        }
+        // A change broadcast while the initial read was in flight is newer.
+        if (!broadcastApplied) {
+          settingsRef.current = loaded;
+          setSettings(loaded);
+        }
         setLoading(false);
-      }
-    });
+      })
+      .catch(() => {
+        // Store unreadable: keep the defaults and leave the loading state.
+        if (active) {
+          setLoading(false);
+        }
+      });
     void subscribeSettings((next) => {
       if (active) {
+        broadcastApplied = true;
+        settingsRef.current = next;
         setSettings(next);
       }
-    }).then((fn) => {
-      if (active) {
-        unlisten = fn;
-      } else {
-        fn();
-      }
-    });
+    })
+      .then((fn) => {
+        if (active) {
+          unlisten = fn;
+        } else {
+          fn();
+        }
+      })
+      .catch(() => {
+        // Subscription unavailable: the initial load still controls loading.
+      });
     return () => {
       active = false;
       unlisten?.();
     };
   }, []);
 
-  const updateSettings = useCallback(
-    async (patch: Partial<AppSettings>): Promise<void> => {
-      const next: AppSettings = { ...settings, ...patch };
-      setSettings(next);
-      await saveSettings(next);
-    },
-    [settings],
-  );
+  const updateSettings = useCallback(async (patch: Partial<AppSettings>): Promise<void> => {
+    const next: AppSettings = { ...settingsRef.current, ...patch };
+    settingsRef.current = next;
+    setSettings(next);
+    await saveSettings(next);
+  }, []);
 
   const value = useMemo<SettingsContextValue>(
     () => ({ settings, updateSettings, loading }),

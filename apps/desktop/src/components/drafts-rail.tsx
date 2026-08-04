@@ -1,6 +1,6 @@
 import { cn, Input, ScrollArea, TooltipProvider } from "@velata/ui";
 import { ALargeSmall, ArrowRightLeft, Menu, Search, SquarePen, X } from "lucide-react";
-import { type ReactElement, useEffect, useState } from "react";
+import { type ReactElement, useEffect, useMemo, useState } from "react";
 
 import { DraftRow } from "@/components/draft-row";
 import { type Draft } from "@/hooks/use-drafts";
@@ -52,7 +52,7 @@ export function DraftsRail({
     };
   }, [open]);
 
-  const results = searchDrafts(drafts, query);
+  const results = useMemo(() => searchDrafts(drafts, query), [drafts, query]);
   const noMatches = query.trim().length > 0 && results.length === 0;
 
   function handleCreate(): void {

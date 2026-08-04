@@ -1,25 +1,12 @@
-import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { type Instruction, refine } from "@velata/core";
 import { useCallback } from "react";
 
 import { useSettings } from "@/hooks/use-settings";
+import { tauriFetch } from "@/lib/http";
 import { getApiKey } from "@/lib/keychain";
+import { MissingApiKeyError, MissingModelError } from "@/lib/refine-errors";
 
-/** Thrown when a refine is attempted with no API key stored in the keychain. */
-export class MissingApiKeyError extends Error {
-  public override readonly name = "MissingApiKeyError";
-  public constructor() {
-    super("No API key configured");
-  }
-}
-
-/** Thrown when a refine is attempted with no model configured in settings. */
-export class MissingModelError extends Error {
-  public override readonly name = "MissingModelError";
-  public constructor() {
-    super("No model configured");
-  }
-}
+export { MissingApiKeyError, MissingModelError };
 
 /** Runs an instruction against the configured provider and returns the refined text. */
 export type RefineFn = (

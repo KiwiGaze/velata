@@ -1,6 +1,8 @@
 import { type Instruction } from "@velata/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MissingApiKeyError } from "@/lib/refine-errors";
+
 import {
   createLivePreviewScheduler,
   PREVIEW_DEBOUNCE_MS,
@@ -230,9 +232,7 @@ describe("createLivePreviewScheduler", () => {
   it("maps missing-config errors to the connect message", async () => {
     const { states, calls, scheduler } = makeHarness();
     scheduler.refreshNow("draft", CLEAN, "d1");
-    const error = new Error("No API key configured");
-    error.name = "MissingApiKeyError";
-    calls[0]?.deferred.reject(error);
+    calls[0]?.deferred.reject(new MissingApiKeyError());
     await flush();
     expect(states.at(-1)).toEqual({
       text: "",

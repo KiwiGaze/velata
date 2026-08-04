@@ -1,14 +1,13 @@
 import { type Instruction } from "@velata/core";
-import {
-  Button,
-  Separator,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@velata/ui";
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@velata/ui";
 import { RefreshCw } from "lucide-react";
 import { type ReactElement } from "react";
+
+import {
+  FloatingToolbar,
+  preventEditorBlur,
+  TOOLBAR_ICON_BUTTON_CLASS,
+} from "@/components/floating-toolbar";
 
 interface TransformBarProps {
   presets: readonly Instruction[];
@@ -25,52 +24,44 @@ export function TransformBar({
   onShuffle,
 }: TransformBarProps): ReactElement {
   return (
-    <TooltipProvider>
-      <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
-        <div
-          role="toolbar"
-          aria-label="Transforms"
-          aria-orientation="horizontal"
-          className="pointer-events-auto border-line bg-paper flex items-center gap-1 rounded-[11px] border px-1.5 py-1 shadow-[0_10px_28px_-14px_rgb(0_0_0/0.3),0_2px_8px_-4px_rgb(0_0_0/0.12)]"
-        >
-          {presets.map((preset) => (
+    <FloatingToolbar
+      ariaLabel="Transforms"
+      gapClassName="gap-1"
+      trailing={
+        <Tooltip>
+          <TooltipTrigger asChild>
             <Button
-              key={preset.id}
               type="button"
               variant="ghost"
-              size="sm"
-              disabled={disabled}
-              onMouseDown={(event) => {
-                event.preventDefault();
-              }}
+              aria-label="New batch"
+              onMouseDown={preventEditorBlur}
               onClick={() => {
-                onRun(preset);
+                onShuffle();
               }}
+              className={TOOLBAR_ICON_BUTTON_CLASS}
             >
-              {preset.name}
+              <RefreshCw aria-hidden className="size-3.5" />
             </Button>
-          ))}
-          <Separator orientation="vertical" className="mx-0.5 h-4" />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label="New batch"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                }}
-                onClick={() => {
-                  onShuffle();
-                }}
-                className="text-ink-2 hover:bg-raise hover:text-ink inline-flex size-7 items-center justify-center rounded-[7px] transition-colors"
-              >
-                <RefreshCw aria-hidden className="size-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">New batch</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-    </TooltipProvider>
+          </TooltipTrigger>
+          <TooltipContent side="top">New batch</TooltipContent>
+        </Tooltip>
+      }
+    >
+      {presets.map((preset) => (
+        <Button
+          key={preset.id}
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={disabled}
+          onMouseDown={preventEditorBlur}
+          onClick={() => {
+            onRun(preset);
+          }}
+        >
+          {preset.name}
+        </Button>
+      ))}
+    </FloatingToolbar>
   );
 }

@@ -14,30 +14,16 @@ import { type ReactElement, useState } from "react";
 import { VelataMark } from "@/components/logo";
 import { useSettings } from "@/hooks/use-settings";
 import { setApiKey } from "@/lib/keychain";
+import { type ProviderOption, PROVIDERS } from "@/lib/providers";
 
-interface ProviderOption {
-  value: string;
-  label: string;
+interface PresetProvider extends ProviderOption {
   baseUrl: string;
-  model: string;
 }
 
-const PROVIDERS: readonly ProviderOption[] = [
-  {
-    value: "glm",
-    label: "GLM",
-    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
-    model: "glm-4-plus",
-  },
-  { value: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1", model: "gpt-4.1" },
-  {
-    value: "cerebras",
-    label: "Cerebras",
-    baseUrl: "https://api.cerebras.ai/v1",
-    model: "gemma-4-31b",
-  },
-  { value: "kimi", label: "Kimi", baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-8k" },
-];
+/** Onboarding offers only the preset providers (no Custom). */
+const PRESET_PROVIDERS = PROVIDERS.filter(
+  (provider): provider is PresetProvider => provider.baseUrl !== null,
+);
 
 const HERO_KEYS: readonly string[] = ["⌘", "⇧", "Space"];
 
@@ -48,7 +34,7 @@ export function Onboarding(): ReactElement {
 
   function handleStart(): void {
     const key = apiKeyInput.trim();
-    const option = PROVIDERS.find((item) => item.value === provider);
+    const option = PRESET_PROVIDERS.find((item) => item.value === provider);
     if (option === undefined || key === "") {
       void updateSettings({ onboarded: true });
       return;
@@ -110,7 +96,7 @@ export function Onboarding(): ReactElement {
                   <SelectValue placeholder="Provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PROVIDERS.map((option) => (
+                  {PRESET_PROVIDERS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>

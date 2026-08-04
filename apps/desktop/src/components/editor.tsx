@@ -53,6 +53,11 @@ export function Editor({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
+  // Tracks the value the editor was last synced to, so an external `value` that
+  // equals what the editor already produced (the common round-trip after onUpdate)
+  // skips the O(doc) `getMarkdown()` comparison and the no-op `setContent`.
+  const lastSyncedRef = useRef(value);
+
   const editor = useEditor({
     extensions: velataExtensions,
     content: value,
@@ -62,12 +67,15 @@ export function Editor({
       attributes: { "aria-label": "Scratch pad", role: "textbox", "aria-multiline": "true" },
     },
     onUpdate: ({ editor: instance }) => {
-      onChangeRef.current(instance.getMarkdown());
+      const markdown = instance.getMarkdown();
+      lastSyncedRef.current = markdown;
+      onChangeRef.current(markdown);
     },
   });
 
   useEffect(() => {
-    if (value !== editor.getMarkdown()) {
+    if (value !== lastSyncedRef.current) {
+      lastSyncedRef.current = value;
       editor.commands.setContent(value, { contentType: "markdown", emitUpdate: false });
     }
   }, [editor, value]);

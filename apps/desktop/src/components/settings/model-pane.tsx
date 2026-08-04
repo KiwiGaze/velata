@@ -1,4 +1,3 @@
-import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { testConnection } from "@velata/core";
 import {
   Button,
@@ -13,23 +12,12 @@ import {
 import { type ReactElement, useEffect, useRef, useState } from "react";
 
 import { useSettings } from "@/hooks/use-settings";
+import { tauriFetch } from "@/lib/http";
 import { deleteApiKey, getApiKey, setApiKey } from "@/lib/keychain";
+import { PROVIDERS } from "@/lib/providers";
+import { describeRefineError } from "@/lib/refine-errors";
 
 import { PaneHeader, SettingsRow } from "./primitives";
-
-interface ProviderOption {
-  value: string;
-  label: string;
-  baseUrl: string | null;
-}
-
-const PROVIDERS: readonly ProviderOption[] = [
-  { value: "glm", label: "GLM (Zhipu)", baseUrl: "https://open.bigmodel.cn/api/paas/v4" },
-  { value: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1" },
-  { value: "cerebras", label: "Cerebras", baseUrl: "https://api.cerebras.ai/v1" },
-  { value: "kimi", label: "Kimi (Moonshot)", baseUrl: "https://api.moonshot.cn/v1" },
-  { value: "custom", label: "Custom…", baseUrl: null },
-];
 
 type TestStatus =
   | { kind: "idle" }
@@ -153,10 +141,7 @@ export function ModelPane(): ReactElement {
         }
         setStatus(result.ok ? { kind: "ok" } : { kind: "error", message: result.error });
       } catch (error) {
-        setStatus({
-          kind: "error",
-          message: error instanceof Error ? error.message : "Unknown error",
-        });
+        setStatus({ kind: "error", message: describeRefineError(error) });
       }
     })();
   }

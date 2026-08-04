@@ -76,16 +76,23 @@ export function reduceDrafts(state: DraftsState, action: DraftsAction): DraftsSt
       return { drafts, activeId: neighborId };
     }
     case "update": {
-      return {
-        ...state,
-        drafts: state.drafts
-          .map((draft) =>
-            draft.id === state.activeId
-              ? { ...draft, text: action.text, updatedAt: Date.now() }
-              : draft,
-          )
-          .sort(byNewestFirst),
-      };
+      const now = Date.now();
+      const index = state.drafts.findIndex((draft) => draft.id === state.activeId);
+      const current = index === -1 ? undefined : state.drafts[index];
+      if (current === undefined) {
+        return state;
+      }
+      const updated: Draft = { ...current, text: action.text, updatedAt: now };
+      // The active draft is almost always already first (newest). When it isn't,
+      // move just it to the front instead of cloning every draft and re-sorting,
+      // keeping the per-keystroke path cheap.
+      if (index === 0) {
+        return { ...state, drafts: [updated, ...state.drafts.slice(1)] };
+      }
+      const drafts = state.drafts.slice();
+      drafts.splice(index, 1);
+      drafts.unshift(updated);
+      return { ...state, drafts };
     }
     case "hydrate": {
       const isPristine = state.drafts.length === 1 && state.drafts[0]?.text === "";
