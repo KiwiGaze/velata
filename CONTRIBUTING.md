@@ -55,7 +55,7 @@ Some behaviors (focus steal and return, global shortcut, tray, keychain) cannot 
 
 pnpm workspaces + Turborepo. `apps/*` may depend on `packages/*`, never the reverse.
 
-- `packages/core` — provider-agnostic refine logic. Pure TypeScript: no React, no Tauri imports. All unit tests live here.
+- `packages/core` — provider-agnostic refine logic. Pure TypeScript: no React or Tauri imports.
 - `packages/ui` — shadcn/ui copy-in components and shared CSS tokens.
 - `packages/config` — shared tsconfig, ESLint, and Prettier config.
 - `apps/desktop` — the Tauri v2 app (React frontend + Rust in `src-tauri/`).
@@ -65,10 +65,12 @@ pnpm workspaces + Turborepo. `apps/*` may depend on `packages/*`, never the reve
 These are design decisions, not open questions. PRs that break them will not be accepted:
 
 1. **Copy, never inject.** Velata only writes the clipboard and hides its window. It never simulates keystrokes or auto-pastes into other apps.
-2. **BYOK.** Refine calls go directly from the client to a user-configured OpenAI-compatible endpoint. The API key lives only in the macOS Keychain — never in `settings.json`, logs, or code.
+2. **Explicit local transports.** BYOK HTTP calls go directly from the client to a user-configured OpenAI-compatible endpoint, with the API key only in the macOS Keychain. The optional Codex Spark transport uses the installed Codex CLI and its existing login; it never receives the Velata Keychain API key. Keys and CLI credentials never belong in `settings.json`, logs, or code.
 3. **Local-first hybrid positioning.** Local mode is the current shipped mode. Velata Cloud sync is future, optional, and must never be described as available before it exists.
 4. The default refine prompt treats input only as text to clean. It must never execute, answer, or act on the draft.
 5. Keybindings are fixed: summon `⌘⇧Space` · Refine `⌘K` · Copy & Close `⌘↵` · Cut & Close `⌘⇧↵` · Dismiss `Esc` · Delete draft `⌘W`.
+
+Local mode has no Velata telemetry or cloud sync. Do not describe the future cloud mode as shipped.
 
 ## Code standards
 

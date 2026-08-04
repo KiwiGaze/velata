@@ -36,6 +36,7 @@ import { useRefine } from "@/hooks/use-refine";
 import { useScratchpadKeys } from "@/hooks/use-scratchpad-keys";
 import { useSettings } from "@/hooks/use-settings";
 import { previewCopyText } from "@/lib/live-preview-scheduler";
+import { getActiveModel } from "@/lib/providers";
 import { describeRefineError } from "@/lib/refine-errors";
 import { TARGET_OPTIONS, targetLanguageLabel, toTargetLanguage } from "@/lib/target-language";
 import { pickTransforms, TRANSFORM_COUNT } from "@/lib/transforms";
@@ -103,7 +104,8 @@ export function ScratchPad(): ReactElement {
   const refining = phase.kind === "refining";
   const formattingOpen = activePanel === "formatting";
   const transformsOpen = activePanel === "transforms";
-  const model = settings.model.length > 0 ? settings.model : "No model";
+  const activeModel = getActiveModel(settings.provider, settings.model);
+  const model = activeModel.length > 0 ? activeModel : "No model";
 
   const previewInstruction = useMemo<Instruction>(
     () =>

@@ -39,11 +39,16 @@ Drafts persist between summons, so nothing is lost when the window hides. Velata
 
 ## Data modes
 
-Today Velata runs in local mode. Drafts and settings stay on your Mac, refine calls go directly from the app to the OpenAI-compatible `/chat/completions` endpoint you configure in Settings, and your API key is stored in the macOS Keychain. Use OpenAI, GLM, Kimi, Cerebras, a local OpenAI-compatible server, or anything with that shape. While Split Preview is on, your draft is sent to your configured endpoint automatically as you type.
+Today Velata runs in local mode. Drafts and settings stay on your Mac, with two explicit refine transports:
+
+- **BYOK HTTP:** requests go directly from the app to the OpenAI-compatible `/chat/completions` endpoint configured in Settings. The API key is stored in the macOS Keychain. Use OpenAI, GLM, Kimi, Cerebras, a local compatible server, or anything with that shape.
+- **Codex Spark:** requests run through an installed Codex CLI pinned to `gpt-5.3-codex-spark`. This option reuses your existing `codex login` session and never sends a Velata Keychain API key. It requires a ChatGPT Pro account with Spark access.
+
+While Split Preview is on, your draft is sent through the selected transport automatically as you type.
 
 Velata Cloud sync is planned as a future opt-in mode for people who want their scratchpad available across devices. It is not implemented in this release: there are no Velata accounts, cloud draft storage, or cloud sync paths today.
 
-There is no telemetry. The refine prompt treats your draft strictly as text to clean. It never executes or answers the draft, even when it reads like an instruction.
+Neither transport adds Velata telemetry or cloud sync. The refine prompt treats your draft strictly as text to clean. It never executes or answers the draft, even when it reads like an instruction.
 
 ## Build from source
 
@@ -59,7 +64,7 @@ pnpm tauri build    # release bundle → apps/desktop/src-tauri/target/release/b
 
 pnpm workspaces + Turborepo:
 
-- `apps/desktop` — the Tauri v2 app (React 19 frontend, Rust shell)
+- `apps/desktop` — the Tauri v2 app (React 19 frontend, provider router, and Rust shell/CLI process boundary)
 - `packages/core` — provider-agnostic refine logic and prompt (pure TypeScript, unit-tested)
 - `packages/ui` — shadcn/ui components and shared CSS tokens
 - `packages/config` — shared TypeScript, ESLint, and Prettier config

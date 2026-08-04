@@ -22,10 +22,10 @@ Only the latest release receives security fixes.
 Understanding what Velata does and does not do today helps scope reports:
 
 - **Local mode is the current shipped mode.** Drafts and settings stay on the device. Velata Cloud sync is planned as a future opt-in mode, but it is not implemented in this release.
-- **Bring your own key.** Refine requests go directly from the app to the OpenAI-compatible endpoint you configure. There is no Velata server in between for refine calls.
-- **The API key is stored only in the macOS Keychain** (service `com.velata.app`). It is never written to `settings.json`, logs, or disk.
+- **Local mode has two explicit refine transports.** BYOK HTTP requests go directly from the app to the OpenAI-compatible endpoint you configure. The optional Codex Spark transport launches the installed Codex CLI, which communicates with its service using the CLI's existing login. There is no Velata server in between for either transport.
+- **HTTP and CLI credentials stay separate.** The HTTP API key is stored only in the macOS Keychain (service `com.velata.app`) and is never written to `settings.json`, logs, or code. The Spark transport does not receive that key, and Velata does not read, copy, or store the Codex CLI's login credentials.
 - **Clipboard only.** Velata writes refined text to the clipboard and hides its window. It never simulates keystrokes and never injects text into other applications.
 - **The refine prompt treats input as text to clean, never as instructions to execute.**
-- **No telemetry.** The app makes no network requests other than the refine and connection-test calls to the endpoint you configured.
+- **No Velata telemetry or cloud sync.** HTTP refine and connection-test calls use the configured endpoint. Spark refine and connection-test calls run through Codex CLI and may make the network requests required by that service. Velata adds no telemetry, intermediary service, account system, or cloud-sync traffic.
 
 Reports about weakening any of the above (key leakage, prompt-guard bypass that causes input execution, unexpected network calls) are especially welcome.

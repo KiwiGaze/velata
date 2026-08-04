@@ -11,6 +11,8 @@ use tauri_nspanel::{
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+mod codex;
+
 tauri_panel! {
     panel!(ScratchpadPanel {
         config: {
@@ -144,6 +146,7 @@ pub fn run() {
             }
         })
         .manage(PreviousApp::default())
+        .manage(codex::CodexRegistry::default())
         .plugin(tauri_nspanel::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::new().build())
@@ -157,7 +160,9 @@ pub fn run() {
             set_api_key,
             delete_api_key,
             open_settings,
-            hide_scratchpad
+            hide_scratchpad,
+            codex::refine_with_codex_spark,
+            codex::cancel_codex_spark
         ])
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -243,6 +248,7 @@ pub fn run() {
                         let _ = show_settings(app);
                     }
                     "quit-velata" => {
+                        codex::shutdown_codex(&app.state::<codex::CodexRegistry>());
                         app.exit(0);
                     }
                     _ => {}
