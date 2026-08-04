@@ -1,9 +1,9 @@
 use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::ffi::{OsStr, OsString};
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
@@ -846,19 +846,33 @@ fn process_group_exists(process_group_id: i32) -> bool {
 }
 
 fn read_final_output(path: &Path, max_bytes: usize) -> Result<String, CodexSparkError> {
-    let file = File::open(path).map_err(|_| {
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
+        .open(path)
+        .map_err(|_| {
+            CodexSparkError::new(
+                CodexSparkErrorCode::OutputUnreadable,
+                "Could not read the refined output.",
+            )
+        })?;
+    let metadata = file.metadata().map_err(|_| {
         CodexSparkError::new(
             CodexSparkErrorCode::OutputUnreadable,
             "Could not read the refined output.",
         )
     })?;
-    if let Ok(metadata) = file.metadata() {
-        if metadata.len() > max_bytes as u64 {
-            return Err(CodexSparkError::new(
-                CodexSparkErrorCode::OutputTooLarge,
-                "Codex response is too large.",
-            ));
-        }
+    if !metadata.file_type().is_file() {
+        return Err(CodexSparkError::new(
+            CodexSparkErrorCode::OutputUnreadable,
+            "Could not read the refined output.",
+        ));
+    }
+    if metadata.len() > max_bytes as u64 {
+        return Err(CodexSparkError::new(
+            CodexSparkErrorCode::OutputTooLarge,
+            "Codex response is too large.",
+        ));
     }
     let mut bytes = Vec::new();
     file.take((max_bytes + 1) as u64)
@@ -972,10 +986,16 @@ fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::fs::PermissionsExt;
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::{symlink, PermissionsExt};
     use std::sync::mpsc;
 
     static TEST_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+    const FIFO_CHILD_PATH_ENV: &str = "VELATA_CODEX_FIFO_CHILD_PATH";
+    const FIFO_CHILD_SUCCESS_PATH_ENV: &str = "VELATA_CODEX_FIFO_CHILD_SUCCESS_PATH";
+    const FIFO_TEST_NAME: &str =
+        "codex::tests::final_output_rejects_symlinks_and_fifos_without_blocking";
     const TEST_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 
     struct TestDirectory(PathBuf);
@@ -1882,6 +1902,73 @@ printf '12345' > "$output"
         .expect_err("missing executable is rejected");
         assert_eq!(error.code, CodexSparkErrorCode::CliNotFound);
         assert_no_run_directories(directory.path());
+    }
+
+    #[test]
+    fn final_output_rejects_symlinks_and_fifos_without_blocking() {
+        if let Some(fifo_path) = env::var_os(FIFO_CHILD_PATH_ENV) {
+            let success_path = env::var_os(FIFO_CHILD_SUCCESS_PATH_ENV)
+                .expect("FIFO child success path is configured");
+            assert_eq!(
+                read_final_output(Path::new(&fifo_path), 1024)
+                    .expect_err("FIFO output is rejected")
+                    .code,
+                CodexSparkErrorCode::OutputUnreadable
+            );
+            fs::write(success_path, "output-unreadable").expect("record FIFO child success");
+            return;
+        }
+
+        let directory = TestDirectory::new();
+        let target_path = directory.path().join("target");
+        let symlink_path = directory.path().join("symlink-output");
+        fs::write(&target_path, "target text").expect("write symlink target");
+        symlink(&target_path, &symlink_path).expect("create output symlink");
+        assert_eq!(
+            read_final_output(&symlink_path, 1024)
+                .expect_err("symlink output is rejected")
+                .code,
+            CodexSparkErrorCode::OutputUnreadable
+        );
+
+        let fifo_path = directory.path().join("fifo-output");
+        let child_success_path = directory.path().join("fifo-child-success");
+        let fifo_path_c = CString::new(fifo_path.as_os_str().as_bytes()).expect("valid FIFO path");
+        assert_eq!(unsafe { libc::mkfifo(fifo_path_c.as_ptr(), 0o600) }, 0);
+        let mut child = Command::new(env::current_exe().expect("resolve current test executable"))
+            .args(["--exact", FIFO_TEST_NAME, "--nocapture"])
+            .env(FIFO_CHILD_PATH_ENV, &fifo_path)
+            .env(FIFO_CHILD_SUCCESS_PATH_ENV, &child_success_path)
+            .spawn()
+            .expect("spawn FIFO output test child");
+        let started_at = Instant::now();
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) if started_at.elapsed() < TEST_WAIT_TIMEOUT => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Ok(None) => {
+                    let kill_result = child.kill();
+                    let reap_result = child.wait();
+                    panic!(
+                        "FIFO output child timed out; kill: {kill_result:?}; reap: {reap_result:?}"
+                    );
+                }
+                Err(error) => {
+                    let kill_result = child.kill();
+                    let reap_result = child.wait();
+                    panic!(
+                        "Could not inspect FIFO output child: {error}; kill: {kill_result:?}; reap: {reap_result:?}"
+                    );
+                }
+            }
+        };
+        assert!(status.success(), "FIFO output child failed: {status}");
+        assert_eq!(
+            fs::read_to_string(child_success_path).expect("FIFO child recorded success"),
+            "output-unreadable"
+        );
     }
 
     #[test]
