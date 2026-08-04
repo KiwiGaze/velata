@@ -34,13 +34,20 @@ export function SettingsProvider({ children }: { children: ReactNode }): ReactEl
   useEffect(() => {
     let active = true;
     let unlisten: (() => void) | null = null;
-    void loadSettings().then((loaded) => {
-      if (active) {
-        settingsRef.current = loaded;
-        setSettings(loaded);
-        setLoading(false);
-      }
-    });
+    void loadSettings()
+      .then((loaded) => {
+        if (active) {
+          settingsRef.current = loaded;
+          setSettings(loaded);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        // Store unreadable: keep the defaults and leave the loading state.
+        if (active) {
+          setLoading(false);
+        }
+      });
     void subscribeSettings((next) => {
       if (active) {
         settingsRef.current = next;

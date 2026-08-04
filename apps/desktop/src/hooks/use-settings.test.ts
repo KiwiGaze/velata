@@ -45,6 +45,11 @@ function UpdatingProbe(): ReactElement {
   return createElement("span", null, "ready");
 }
 
+function LoadingProbe(): ReactElement {
+  const { loading, settings } = useSettings();
+  return createElement("span", null, loading ? "loading" : `ready:${settings.provider}`);
+}
+
 async function flush(): Promise<void> {
   await act(async () => {
     await Promise.resolve();
@@ -91,5 +96,20 @@ describe("SettingsProvider", () => {
       provider: "openai",
       model: "gpt-4.1",
     });
+  });
+
+  it("keeps the defaults and stops loading when the initial load fails", async () => {
+    settingsMocks.loadSettings.mockRejectedValue(new Error("store open failed"));
+    settingsMocks.subscribeSettings.mockResolvedValue(() => undefined);
+
+    const container = document.createElement("div");
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(createElement(SettingsProvider, null, createElement(LoadingProbe)));
+    });
+    await flush();
+
+    expect(container.textContent).toBe(`ready:${settingsMocks.defaultSettings.provider}`);
   });
 });
