@@ -6,7 +6,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  deleteApiKey: vi.fn<() => Promise<void>>(),
   getApiKey: vi.fn<() => Promise<string | null>>(),
+  setApiKey: vi.fn<(key: string) => Promise<void>>(),
   settings: {
     provider: "openai",
     baseUrl: "https://api.openai.com/v1",
@@ -25,9 +27,9 @@ vi.mock("@/lib/codex-spark", () => ({
   testCodexSparkConnection: mocks.testCodexSparkConnection,
 }));
 vi.mock("@/lib/keychain", () => ({
-  deleteApiKey: vi.fn(),
+  deleteApiKey: mocks.deleteApiKey,
   getApiKey: mocks.getApiKey,
-  setApiKey: vi.fn(),
+  setApiKey: mocks.setApiKey,
 }));
 vi.mock("@velata/ui", async () => {
   const { createElement: element, Fragment } = await import("react");
@@ -66,18 +68,29 @@ const { ModelPane } = await import("./model-pane");
 
 interface Deferred<TValue> {
   readonly promise: Promise<TValue>;
+  readonly reject: (reason: unknown) => void;
   readonly resolve: (value: TValue) => void;
 }
 
 function createDeferred<TValue>(): Deferred<TValue> {
+  let reject: ((reason: unknown) => void) | undefined;
   let resolve: ((value: TValue) => void) | undefined;
-  const promise = new Promise<TValue>((promiseResolve) => {
+  const promise = new Promise<TValue>((promiseResolve, promiseReject) => {
+    reject = promiseReject;
     resolve = promiseResolve;
   });
-  if (resolve === undefined) {
+  if (reject === undefined || resolve === undefined) {
     throw new Error("Deferred promise did not initialize");
   }
-  return { promise, resolve };
+  return { promise, reject, resolve };
+}
+
+function enterInputValue(input: HTMLInputElement, value: string): void {
+  const didSetValue = Reflect.set(HTMLInputElement.prototype, "value", value, input);
+  if (!didSetValue) {
+    throw new Error("Input value setter was not available");
+  }
+  input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 describe("ModelPane", () => {
@@ -92,6 +105,8 @@ describe("ModelPane", () => {
       model: "gpt-4.1",
     };
     mocks.getApiKey.mockResolvedValue("stored-key");
+    mocks.deleteApiKey.mockResolvedValue();
+    mocks.setApiKey.mockResolvedValue();
     mocks.testConnection.mockResolvedValue({ ok: true });
     mocks.testCodexSparkConnection.mockResolvedValue({ ok: true });
     mocks.updateSettings.mockImplementation((patch: Partial<typeof mocks.settings>) => {
@@ -148,6 +163,20 @@ describe("ModelPane", () => {
       button.click();
       await Promise.resolve();
     });
+  }
+
+  async function blurKeyInput(input: HTMLInputElement, value: string): Promise<void> {
+    await act(async () => {
+      enterInputValue(input, value);
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await Promise.resolve();
+    });
+  }
+
+  function getVisibleErrorText(): string | undefined {
+    return [...container.querySelectorAll("span")]
+      .map((span) => (span as Node).textContent ?? "")
+      .find((text) => text.startsWith("✗ "));
   }
 
   it("renders Spark guidance and tests the CLI without HTTP credentials", async () => {
@@ -250,6 +279,265 @@ describe("ModelPane", () => {
     await flush();
 
     expect(mocks.testConnection).not.toHaveBeenCalled();
+  });
+
+  it("reports mounted key lookup failures and contains stale unmounted failures", async () => {
+    const mountedLookup = createDeferred<string | null>();
+    const staleLookup = createDeferred<string | null>();
+    const untrustedReadDetail = `key read rejected: ${"detail".repeat(100)}`;
+    const unhandledRejections: unknown[] = [];
+    const recordUnhandledRejection = (reason: unknown): void => {
+      unhandledRejections.push(reason);
+    };
+    mocks.getApiKey
+      .mockReturnValueOnce(mountedLookup.promise)
+      .mockReturnValueOnce(staleLookup.promise);
+    process.on("unhandledRejection", recordUnhandledRejection);
+
+    try {
+      render();
+      mountedLookup.reject(new Error(untrustedReadDetail));
+      await flush();
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      const visibleError = getVisibleErrorText();
+      const hasBoundedReadError =
+        visibleError !== undefined && visibleError.length <= 80 && /key/i.test(visibleError);
+      const exposesUntrustedDetail = visibleError?.includes(untrustedReadDetail) ?? false;
+
+      act(() => {
+        root?.unmount();
+      });
+      root = createRoot(container);
+      render();
+      act(() => {
+        root?.unmount();
+        root = null;
+      });
+      staleLookup.reject(new Error("stale key read rejected"));
+      await flush();
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      expect({
+        exposesUntrustedDetail,
+        hasBoundedReadError,
+        unhandledRejectionCount: unhandledRejections.length,
+      }).toEqual({
+        exposesUntrustedDetail: false,
+        hasBoundedReadError: true,
+        unhandledRejectionCount: 0,
+      });
+    } finally {
+      process.off("unhandledRejection", recordUnhandledRejection);
+    }
+  });
+
+  it("preserves a newer successful save when the initial lookup completes later", async () => {
+    const keyLookup = createDeferred<string | null>();
+    mocks.getApiKey.mockReturnValue(keyLookup.promise);
+    render();
+
+    const keyInput = container.querySelector<HTMLInputElement>("#model-api-key");
+    if (keyInput === null) {
+      throw new Error("API key input was not rendered");
+    }
+    await act(async () => {
+      enterInputValue(keyInput, "new-key");
+      keyInput.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const hasRemoveAction = (): boolean =>
+      [...container.querySelectorAll("button")].some((button) => button.textContent === "Remove");
+    expect(hasRemoveAction()).toBe(true);
+
+    keyLookup.resolve(null);
+    await flush();
+
+    expect(hasRemoveAction()).toBe(true);
+  });
+
+  it("dispatches each rapid save before the earlier save settles", async () => {
+    const firstSave = createDeferred<undefined>();
+    const secondSave = createDeferred<undefined>();
+    mocks.setApiKey.mockReturnValueOnce(firstSave.promise).mockReturnValueOnce(secondSave.promise);
+    render();
+
+    const keyInput = container.querySelector<HTMLInputElement>("#model-api-key");
+    if (keyInput === null) {
+      throw new Error("API key input was not rendered");
+    }
+    await act(async () => {
+      enterInputValue(keyInput, "first-key");
+      keyInput.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      enterInputValue(keyInput, "newer-key");
+      keyInput.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const savesDispatchedBeforeFirstSettles = mocks.setApiKey.mock.calls.map(([key]) => key);
+    firstSave.resolve(undefined);
+    await flush();
+    secondSave.resolve(undefined);
+    await flush();
+
+    expect(savesDispatchedBeforeFirstSettles).toEqual(["first-key", "newer-key"]);
+  });
+
+  it("keeps a newer connection test active when a pending save succeeds", async () => {
+    const keySave = createDeferred<undefined>();
+    const connection = createDeferred<{ readonly ok: true }>();
+    mocks.setApiKey.mockReturnValue(keySave.promise);
+    mocks.testConnection.mockReturnValue(connection.promise);
+    render();
+
+    const keyInput = container.querySelector<HTMLInputElement>("#model-api-key");
+    if (keyInput === null) {
+      throw new Error("API key input was not rendered");
+    }
+    await blurKeyInput(keyInput, "new-key");
+    await clickTest();
+
+    keySave.resolve(undefined);
+    await flush();
+    expect(container.textContent).toContain("testing…");
+    expect(container.textContent).not.toContain("not tested");
+
+    connection.resolve({ ok: true });
+    await flush();
+
+    expect(container.textContent).toContain("connected");
+  });
+
+  it("reports a failed save while preserving retry and stored-key state", async () => {
+    const keyLookup = createDeferred<string | null>();
+    const keySave = createDeferred<undefined>();
+    const untrustedSaveDetail = `save rejected: ${"detail".repeat(100)}`;
+    const unhandledRejections: unknown[] = [];
+    const recordUnhandledRejection = (reason: unknown): void => {
+      unhandledRejections.push(reason);
+    };
+    mocks.getApiKey.mockReturnValue(keyLookup.promise);
+    mocks.setApiKey.mockReturnValue(keySave.promise);
+    process.on("unhandledRejection", recordUnhandledRejection);
+
+    try {
+      render();
+      const keyInput = container.querySelector<HTMLInputElement>("#model-api-key");
+      if (keyInput === null) {
+        throw new Error("API key input was not rendered");
+      }
+      await act(async () => {
+        enterInputValue(keyInput, "new-key");
+        keyInput.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+        await Promise.resolve();
+      });
+
+      keySave.reject(new Error(untrustedSaveDetail));
+      await flush();
+      keyLookup.resolve("stored-key");
+      await flush();
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      const retryInput = keyInput.value;
+      const visibleError = getVisibleErrorText();
+      const hasBoundedSaveError =
+        visibleError !== undefined &&
+        visibleError.length <= 80 &&
+        /save/i.test(visibleError) &&
+        /key/i.test(visibleError);
+      const exposesUntrustedDetail = visibleError?.includes(untrustedSaveDetail) ?? false;
+
+      await act(async () => {
+        enterInputValue(keyInput, "");
+        await Promise.resolve();
+      });
+      const hasRemoveAction = [...container.querySelectorAll("button")].some(
+        (button) => button.textContent === "Remove",
+      );
+      expect({
+        exposesUntrustedDetail,
+        hasBoundedSaveError,
+        hasRemoveAction,
+        retryInput,
+        unhandledRejectionCount: unhandledRejections.length,
+      }).toEqual({
+        exposesUntrustedDetail: false,
+        hasBoundedSaveError: true,
+        hasRemoveAction: true,
+        retryInput: "new-key",
+        unhandledRejectionCount: 0,
+      });
+    } finally {
+      process.off("unhandledRejection", recordUnhandledRejection);
+    }
+  });
+
+  it("reports a failed removal while preserving the stored-key action", async () => {
+    const keyRemoval = createDeferred<undefined>();
+    const untrustedRemovalDetail = `remove rejected: ${"detail".repeat(100)}`;
+    const unhandledRejections: unknown[] = [];
+    const recordUnhandledRejection = (reason: unknown): void => {
+      unhandledRejections.push(reason);
+    };
+    mocks.deleteApiKey.mockReturnValue(keyRemoval.promise);
+    process.on("unhandledRejection", recordUnhandledRejection);
+
+    try {
+      render();
+      await flush();
+      const removeButton = [...container.querySelectorAll("button")].find(
+        (button) => button.textContent === "Remove",
+      );
+      if (removeButton === undefined) {
+        throw new Error("Remove button was not rendered");
+      }
+      await act(async () => {
+        removeButton.click();
+        await Promise.resolve();
+      });
+
+      keyRemoval.reject(new Error(untrustedRemovalDetail));
+      await flush();
+      await flush();
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      const visibleError = getVisibleErrorText();
+      const hasBoundedRemovalError =
+        visibleError !== undefined &&
+        visibleError.length <= 80 &&
+        /remove/i.test(visibleError) &&
+        /key/i.test(visibleError);
+      const exposesUntrustedDetail = visibleError?.includes(untrustedRemovalDetail) ?? false;
+      const hasRemoveAction = [...container.querySelectorAll("button")].some(
+        (button) => button.textContent === "Remove",
+      );
+
+      expect({
+        exposesUntrustedDetail,
+        hasBoundedRemovalError,
+        hasRemoveAction,
+        unhandledRejectionCount: unhandledRejections.length,
+      }).toEqual({
+        exposesUntrustedDetail: false,
+        hasBoundedRemovalError: true,
+        hasRemoveAction: true,
+        unhandledRejectionCount: 0,
+      });
+    } finally {
+      process.off("unhandledRejection", recordUnhandledRejection);
+    }
   });
 
   it("cancels an in-flight Spark test when the provider changes", async () => {

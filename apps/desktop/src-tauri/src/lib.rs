@@ -1,5 +1,8 @@
-use std::sync::Mutex;
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
+use serde::Serialize;
+use tauri::ipc::Channel;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{ActivationPolicy, Emitter, Manager};
@@ -27,6 +30,70 @@ const KEYCHAIN_ACCOUNT: &str = "api-key";
 
 #[derive(Default)]
 struct PreviousApp(Mutex<Option<i32>>);
+
+type KeychainOperation = Box<dyn FnOnce() + Send + 'static>;
+
+#[derive(Default)]
+struct KeychainQueue {
+    pending: VecDeque<KeychainOperation>,
+    worker_running: bool,
+}
+
+#[derive(Clone, Default)]
+struct KeychainOperations(Arc<Mutex<KeychainQueue>>);
+
+impl KeychainOperations {
+    fn enqueue(&self, operation: impl FnOnce() + Send + 'static) {
+        let should_start_worker = {
+            let mut queue = self.0.lock().expect("keychain operation queue lock");
+            queue.pending.push_back(Box::new(operation));
+            if queue.worker_running {
+                false
+            } else {
+                queue.worker_running = true;
+                true
+            }
+        };
+        if !should_start_worker {
+            return;
+        }
+
+        let queue = Arc::clone(&self.0);
+        tauri::async_runtime::spawn_blocking(move || loop {
+            let operation = {
+                let mut queue = queue.lock().expect("keychain operation queue lock");
+                match queue.pending.pop_front() {
+                    Some(operation) => operation,
+                    None => {
+                        queue.worker_running = false;
+                        return;
+                    }
+                }
+            };
+            operation();
+        });
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase", tag = "status", content = "value")]
+enum KeychainResponse<TValue> {
+    Success(TValue),
+    Error(String),
+}
+
+fn send_keychain_response<TValue>(
+    on_complete: Channel<KeychainResponse<TValue>>,
+    result: Result<TValue, String>,
+) where
+    TValue: Serialize,
+{
+    let response = match result {
+        Ok(value) => KeychainResponse::Success(value),
+        Err(error) => KeychainResponse::Error(error),
+    };
+    let _ = on_complete.send(response);
+}
 
 fn remember_previous_app(app: &tauri::AppHandle) {
     let own_pid = std::process::id() as i32;
@@ -76,28 +143,46 @@ fn api_key_entry() -> Result<keyring::Entry, String> {
     keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT).map_err(|error| error.to_string())
 }
 
-#[tauri::command(async)]
-fn get_api_key() -> Result<Option<String>, String> {
-    match api_key_entry()?.get_password() {
-        Ok(secret) => Ok(Some(secret)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(error) => Err(error.to_string()),
-    }
+#[tauri::command]
+fn get_api_key(
+    operations: tauri::State<'_, KeychainOperations>,
+    on_complete: Channel<KeychainResponse<Option<String>>>,
+) {
+    operations.enqueue(move || {
+        let result = api_key_entry().and_then(|entry| match entry.get_password() {
+            Ok(secret) => Ok(Some(secret)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(error) => Err(error.to_string()),
+        });
+        send_keychain_response(on_complete, result);
+    });
 }
 
-#[tauri::command(async)]
-fn set_api_key(key: String) -> Result<(), String> {
-    api_key_entry()?
-        .set_password(&key)
-        .map_err(|error| error.to_string())
+#[tauri::command]
+fn set_api_key(
+    key: String,
+    operations: tauri::State<'_, KeychainOperations>,
+    on_complete: Channel<KeychainResponse<()>>,
+) {
+    operations.enqueue(move || {
+        let result = api_key_entry()
+            .and_then(|entry| entry.set_password(&key).map_err(|error| error.to_string()));
+        send_keychain_response(on_complete, result);
+    });
 }
 
-#[tauri::command(async)]
-fn delete_api_key() -> Result<(), String> {
-    match api_key_entry()?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(error) => Err(error.to_string()),
-    }
+#[tauri::command]
+fn delete_api_key(
+    operations: tauri::State<'_, KeychainOperations>,
+    on_complete: Channel<KeychainResponse<()>>,
+) {
+    operations.enqueue(move || {
+        let result = api_key_entry().and_then(|entry| match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(error) => Err(error.to_string()),
+        });
+        send_keychain_response(on_complete, result);
+    });
 }
 
 fn show_settings(app: &tauri::AppHandle) -> Result<(), String> {
@@ -146,6 +231,7 @@ pub fn run() {
             }
         })
         .manage(PreviousApp::default())
+        .manage(KeychainOperations::default())
         .manage(codex::CodexRegistry::default())
         .plugin(tauri_nspanel::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -263,4 +349,66 @@ pub fn run() {
                 codex::shutdown_codex(&app.state::<codex::CodexRegistry>());
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{KeychainOperations, KeychainResponse};
+    use std::sync::{mpsc, Arc, Mutex};
+    use std::time::Duration;
+
+    #[test]
+    fn keychain_response_matches_frontend_contract() {
+        assert_eq!(
+            serde_json::to_value(KeychainResponse::Success(())).expect("serialize success"),
+            serde_json::json!({ "status": "success", "value": null })
+        );
+        assert_eq!(
+            serde_json::to_value(KeychainResponse::<()>::Error("denied".to_string()))
+                .expect("serialize error"),
+            serde_json::json!({ "status": "error", "value": "denied" })
+        );
+    }
+
+    #[test]
+    fn queued_keychain_saves_keep_submission_order() {
+        let operations = KeychainOperations::default();
+        let credential = Arc::new(Mutex::new(None::<&'static str>));
+        let (first_started_sender, first_started_receiver) = mpsc::channel();
+        let (release_first_sender, release_first_receiver) = mpsc::channel();
+        let first_credential = Arc::clone(&credential);
+        operations.enqueue(move || {
+            first_started_sender.send(()).expect("signal first save");
+            release_first_receiver
+                .recv_timeout(Duration::from_secs(1))
+                .expect("release first save");
+            *first_credential.lock().expect("first credential lock") = Some("first-save");
+        });
+        first_started_receiver
+            .recv_timeout(Duration::from_secs(1))
+            .expect("first save should start");
+
+        let (second_finished_sender, second_finished_receiver) = mpsc::channel();
+        let second_credential = Arc::clone(&credential);
+        operations.enqueue(move || {
+            *second_credential.lock().expect("second credential lock") = Some("second-save");
+            second_finished_sender.send(()).expect("signal second save");
+        });
+        assert!(matches!(
+            second_finished_receiver.try_recv(),
+            Err(mpsc::TryRecvError::Empty)
+        ));
+
+        release_first_sender
+            .send(())
+            .expect("allow first save to finish");
+        second_finished_receiver
+            .recv_timeout(Duration::from_secs(1))
+            .expect("second save should finish");
+
+        assert_eq!(
+            *credential.lock().expect("final credential lock"),
+            Some("second-save")
+        );
+    }
 }

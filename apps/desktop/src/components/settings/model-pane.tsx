@@ -27,6 +27,10 @@ type TestStatus =
   | { kind: "ok" }
   | { kind: "error"; message: string };
 
+const KEY_READ_ERROR_MESSAGE = "Could not read API key from Keychain.";
+const KEY_SAVE_ERROR_MESSAGE = "Could not save API key.";
+const KEY_DELETE_ERROR_MESSAGE = "Could not remove API key.";
+
 function statusLabel(status: TestStatus): string {
   switch (status.kind) {
     case "idle":
@@ -51,6 +55,7 @@ export function ModelPane(): ReactElement {
   const [showKey, setShowKey] = useState(false);
   const [status, setStatus] = useState<TestStatus>({ kind: "idle" });
   const abortRef = useRef<AbortController | null>(null);
+  const keyOperationGenerationRef = useRef(0);
 
   useEffect(() => {
     setBaseUrlInput(settings.baseUrl);
@@ -61,17 +66,24 @@ export function ModelPane(): ReactElement {
   }, [settings.model]);
 
   useEffect(() => {
+    const generation = ++keyOperationGenerationRef.current;
     if (settings.provider === CODEX_SPARK_PROVIDER) {
       return;
     }
-    let active = true;
-    void getApiKey().then((key) => {
-      if (active) {
-        setKeyStored(key !== null);
+    void (async () => {
+      try {
+        const key = await getApiKey();
+        if (keyOperationGenerationRef.current === generation) {
+          setKeyStored(key !== null);
+        }
+      } catch {
+        if (keyOperationGenerationRef.current === generation) {
+          setStatus({ kind: "error", message: KEY_READ_ERROR_MESSAGE });
+        }
       }
-    });
+    })();
     return () => {
-      active = false;
+      keyOperationGenerationRef.current += 1;
     };
   }, [settings.provider]);
 
@@ -111,22 +123,75 @@ export function ModelPane(): ReactElement {
     }
   }
 
+  async function recoverKeyStored(mutationGeneration: number): Promise<void> {
+    if (keyOperationGenerationRef.current !== mutationGeneration) {
+      return;
+    }
+    const recoveryGeneration = ++keyOperationGenerationRef.current;
+    try {
+      const key = await getApiKey();
+      if (keyOperationGenerationRef.current === recoveryGeneration) {
+        setKeyStored(key !== null);
+      }
+    } catch {
+      return;
+    }
+  }
+
+  async function handleKeyMutationFailure(generation: number, message: string): Promise<void> {
+    if (keyOperationGenerationRef.current !== generation) {
+      return;
+    }
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStatus({ kind: "error", message });
+    await recoverKeyStored(generation);
+  }
+
+  function beginKeyMutation(): number {
+    const generation = ++keyOperationGenerationRef.current;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStatus({ kind: "idle" });
+    return generation;
+  }
+
   function saveKey(): void {
     const value = keyInput.trim();
     if (value === "") {
       return;
     }
-    void setApiKey(value).then(() => {
+    const generation = beginKeyMutation();
+    void (async () => {
+      try {
+        await setApiKey(value);
+      } catch {
+        await handleKeyMutationFailure(generation, KEY_SAVE_ERROR_MESSAGE);
+        return;
+      }
+      if (keyOperationGenerationRef.current !== generation) {
+        return;
+      }
       setKeyInput("");
       setShowKey(false);
       setKeyStored(true);
-    });
+    })();
   }
 
   function removeKey(): void {
-    void deleteApiKey().then(() => {
+    const generation = beginKeyMutation();
+    void (async () => {
+      try {
+        await deleteApiKey();
+      } catch {
+        await handleKeyMutationFailure(generation, KEY_DELETE_ERROR_MESSAGE);
+        return;
+      }
+      if (keyOperationGenerationRef.current !== generation) {
+        return;
+      }
       setKeyStored(false);
-    });
+    })();
   }
 
   function handleTest(): void {
