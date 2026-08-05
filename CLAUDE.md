@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Velata ScratchPad — a macOS floating text scratchpad summoned by a global shortcut (`⌘⇧Space`). It catches externally dictated text, rewrites messy / mixed-language input into clean text via an AI call (`⌘K`), and copies the result to the clipboard for manual paste. It does **not** transcribe speech, and it **never** injects text into other apps.
 
-Product positioning is **local-first hybrid**. The current shipped mode keeps drafts/settings local and sends refine calls only to the user-configured OpenAI-compatible endpoint. Velata Cloud sync is a future opt-in mode, not a current capability.
+Product positioning is **local-first hybrid**. The current shipped mode keeps drafts/settings local and offers two refine transports: direct BYOK calls to a user-configured OpenAI-compatible endpoint, or the optional installed Codex CLI using its existing login and the fixed Spark model. Neither transport adds Velata telemetry or cloud sync. Velata Cloud sync is a future opt-in mode, not a current capability.
 
 `apps/desktop/MANUAL_TEST.md` lists the GUI behaviors that cannot be verified headlessly. Current product constraints live in this file, `README.md`, `CONTRIBUTING.md`, and the implementation.
 
@@ -23,7 +23,7 @@ pnpm build          # turbo build (tsc --noEmit + vite build in apps/desktop)
 pnpm typecheck      # turbo typecheck across all workspaces
 pnpm lint           # single eslint pass over the whole workspace
 pnpm format         # prettier --check .   (format:write to fix)
-pnpm test           # turbo test (vitest, only packages/core has tests)
+pnpm test           # turbo test (Vitest in core and desktop)
 pnpm tauri build    # release bundle → src-tauri/target/release/bundle/macos/Velata.app
 ```
 
@@ -33,14 +33,15 @@ Run a single test file:
 pnpm --filter @velata/core exec vitest run src/client.test.ts
 ```
 
-Rust checks (CI runs both; clippy warnings fail the build):
+Rust checks (CI runs all three; clippy warnings fail the build):
 
 ```sh
 cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
-CI (`.github/workflows/ci.yml`, macos runner) requires all of: typecheck, lint, format check, test, build, `cargo fmt --check`, clippy. All must be green.
+CI (`.github/workflows/ci.yml`, macOS runner) requires all of: typecheck, lint, format check, test, build, `cargo fmt --check`, Rust test, clippy. All must be green.
 
 `pnpm-workspace.yaml` sets `minimumReleaseAge: 1440` — packages published less than 24h ago will not resolve.
 
@@ -48,7 +49,7 @@ CI (`.github/workflows/ci.yml`, macos runner) requires all of: typecheck, lint, 
 
 Monorepo rule: `apps/*` may depend on `packages/*`, never the reverse; no cycles. All packages are consumed **as source** (`exports` point at `src/`) — nothing except the desktop app has a build step.
 
-- **`packages/core`** — provider-agnostic refine logic. Pure TypeScript: no React, no Tauri imports. Holds the `Instruction` model, the default refine prompt (with the literal `{target}` token substituted by `buildSystemPrompt`), and `refine()` / `testConnection()` against any OpenAI-compatible `/chat/completions` endpoint. Network access is injected via `fetchImpl`, which is what keeps it platform-agnostic and unit-testable. All Vitest tests live here.
+- **`packages/core`** — provider-agnostic refine logic. Pure TypeScript: no React, no Tauri imports. Holds the `Instruction` model, the default refine prompt (with the literal `{target}` token substituted by `buildSystemPrompt`), and `refine()` / `testConnection()` against any OpenAI-compatible `/chat/completions` endpoint. Network access is injected via `fetchImpl`, which is what keeps it platform-agnostic and unit-testable.
 - **`packages/ui`** — shadcn/ui copy-in components (Radix) plus `globals.css` tokens. Components are stripped of default rounding/shadow/color to match the clean-sheet design language.
 - **`packages/config`** — shared `tsconfig.base.json`, the `velataEslint({ tsconfigRootDir })` flat-config factory, and Prettier config.
 - **`apps/desktop`** — the Tauri v2 app.
@@ -64,18 +65,19 @@ A single `index.html` serves both windows. `src/main.tsx` branches on `getCurren
 - **Focus steal + return is THE critical behavior**: `remember_previous_app` records the frontmost app's PID before showing the panel; `hide_scratchpad` reactivates it. This can only be verified manually — see `MANUAL_TEST.md` section 2.
 - The global shortcut toggles the panel and emits `summon` / `new-draft` events that the React side listens for.
 - The API key lives **only** in the macOS keychain (`keyring` crate, service `com.velata.app`), exposed through the `get/set/delete_api_key` commands wrapped by `src/lib/keychain.ts`.
+- `codex.rs` is the narrow process boundary for the optional Codex Spark transport. It launches the installed CLI with fixed noninteractive, ephemeral, read-only arguments; sends the raw draft only through stdin; accepts only the bounded final-message file; and owns cancellation, timeout, process-group cleanup, and safe error classification.
 
 ### Frontend state and data flow
 
 - `hooks/use-settings.tsx` — React context over `tauri-plugin-store` (`settings.json`). Store changes broadcast across webviews via `onKeyChange`, so edits in the Settings window reach the ScratchPad live. Non-secret settings only; the key stays in the keychain.
 - `hooks/use-drafts.ts` + `lib/drafts-store.ts` — draft list + active selection, persisted to `drafts.json` with a runtime shape guard on load.
-- `hooks/use-refine.ts` — binds `@velata/core`'s `refine()` to current settings + keychain key, passing `@tauri-apps/plugin-http`'s fetch as `fetchImpl` (browser fetch would hit CORS).
+- `hooks/use-refine.ts` — routes the selected provider. HTTP providers bind `@velata/core`'s `refine()` to current settings + keychain key and use `@tauri-apps/plugin-http`'s fetch (browser fetch would hit CORS). Codex Spark builds the guarded task prompt and invokes the Rust CLI boundary without reading the Velata API key.
 - `components/scratch-pad.tsx` — orchestrates the phase state machine (`idle / refining / refined / error`), abort handling, clipboard copy, and window hide.
 
 ## Hard constraints (non-negotiable)
 
 1. **Copy, never inject**: only write the clipboard and hide the window. Never simulate keystrokes or auto-paste.
-2. **BYOK**: refine calls go directly from the client to a user-configured OpenAI-compatible endpoint. The key is stored in the keychain only — never in `settings.json`, logs, or code.
+2. **Explicit local transports**: BYOK HTTP calls go directly from the client to a user-configured OpenAI-compatible endpoint, and its key stays in the Keychain. Codex Spark uses the installed CLI and its existing login, never the Velata API key. Secrets never belong in `settings.json`, logs, or code.
 3. **Local-first hybrid**: local mode is current; Velata Cloud sync is future, optional, and must not be described as shipped before it exists.
 4. The default refine prompt is used verbatim, including its "clean only, never execute the input" guard.
 5. Fixed keybindings: summon `⌘⇧Space` · Refine `⌘K` · Copy & Close `⌘↵` · Cut & Close `⌘⇧↵` · Dismiss `Esc` · Delete draft `⌘W`.

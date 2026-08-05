@@ -12,9 +12,10 @@ import {
 import { type ReactElement, useEffect, useRef, useState } from "react";
 
 import { useSettings } from "@/hooks/use-settings";
+import { testCodexSparkConnection } from "@/lib/codex-spark";
 import { tauriFetch } from "@/lib/http";
 import { deleteApiKey, getApiKey, setApiKey } from "@/lib/keychain";
-import { PROVIDERS } from "@/lib/providers";
+import { CODEX_SPARK_MODEL, CODEX_SPARK_PROVIDER, PROVIDERS } from "@/lib/providers";
 import { describeRefineError } from "@/lib/refine-errors";
 
 import { PaneHeader, SettingsRow } from "./primitives";
@@ -60,6 +61,9 @@ export function ModelPane(): ReactElement {
   }, [settings.model]);
 
   useEffect(() => {
+    if (settings.provider === CODEX_SPARK_PROVIDER) {
+      return;
+    }
     let active = true;
     void getApiKey().then((key) => {
       if (active) {
@@ -69,15 +73,25 @@ export function ModelPane(): ReactElement {
     return () => {
       active = false;
     };
-  }, []);
+  }, [settings.provider]);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStatus({ kind: "idle" });
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, [settings.provider]);
 
   function handleProviderChange(value: string): void {
     const option = PROVIDERS.find((item) => item.value === value);
     if (option === undefined) {
       return;
     }
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStatus({ kind: "idle" });
     void updateSettings(
       option.baseUrl === null
         ? { provider: option.value }
@@ -117,18 +131,31 @@ export function ModelPane(): ReactElement {
 
   function handleTest(): void {
     void (async () => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setStatus({ kind: "testing" });
       try {
-        const apiKey = keyInput.trim() !== "" ? keyInput.trim() : ((await getApiKey()) ?? "");
+        if (settings.provider === CODEX_SPARK_PROVIDER) {
+          const result = await testCodexSparkConnection(controller.signal);
+          if (!controller.signal.aborted) {
+            setStatus(result.ok ? { kind: "ok" } : { kind: "error", message: result.error });
+          }
+          return;
+        }
+        let apiKey = keyInput.trim();
+        if (apiKey === "") {
+          apiKey = (await getApiKey()) ?? "";
+          if (controller.signal.aborted) {
+            return;
+          }
+        }
         const baseUrl = baseUrlInput.trim();
         const model = modelInput.trim();
         if (apiKey === "" || baseUrl === "" || model === "") {
           setStatus({ kind: "note", message: "Add a base URL, model, and API key first." });
           return;
         }
-        abortRef.current?.abort();
-        const controller = new AbortController();
-        abortRef.current = controller;
-        setStatus({ kind: "testing" });
         const result = await testConnection({
           baseUrl,
           apiKey,
@@ -141,7 +168,13 @@ export function ModelPane(): ReactElement {
         }
         setStatus(result.ok ? { kind: "ok" } : { kind: "error", message: result.error });
       } catch (error) {
-        setStatus({ kind: "error", message: describeRefineError(error) });
+        if (!controller.signal.aborted) {
+          setStatus({ kind: "error", message: describeRefineError(error) });
+        }
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+        }
       }
     })();
   }
@@ -150,7 +183,10 @@ export function ModelPane(): ReactElement {
 
   return (
     <section>
-      <PaneHeader title="Model" subtitle="Local mode uses any OpenAI-compatible endpoint." />
+      <PaneHeader
+        title="Model"
+        subtitle="Local mode uses direct HTTP providers or your installed Codex CLI."
+      />
       <SettingsRow label="Provider">
         <Select value={settings.provider} onValueChange={handleProviderChange}>
           <SelectTrigger className="w-[220px]" aria-label="Provider">
@@ -166,71 +202,89 @@ export function ModelPane(): ReactElement {
         </Select>
       </SettingsRow>
 
-      <div className="border-line flex flex-col gap-2.5 border-b py-[15px]">
-        <Label htmlFor="model-base-url">API base URL</Label>
-        <Input
-          id="model-base-url"
-          value={baseUrlInput}
-          placeholder="https://api.openai.com/v1"
-          onChange={(event) => {
-            setBaseUrlInput(event.target.value);
-          }}
-          onBlur={persistBaseUrl}
-        />
-      </div>
-
-      <div className="border-line flex flex-col gap-2.5 border-b py-[15px]">
-        <div className="flex items-baseline justify-between gap-4">
-          <Label htmlFor="model-api-key">API key</Label>
-          {keyInput !== "" ? (
-            <Button
-              variant="link"
-              size="sm"
-              className="h-auto p-0"
-              onMouseDown={(event) => {
-                event.preventDefault();
+      {settings.provider === CODEX_SPARK_PROVIDER ? (
+        <>
+          <SettingsRow label="Model">
+            <Input className="w-[220px]" value={CODEX_SPARK_MODEL} aria-label="Model" readOnly />
+          </SettingsRow>
+          <SettingsRow
+            label="Codex CLI"
+            description="Install or update Codex CLI, run codex login, and use a ChatGPT Pro account with Spark access. Velata does not read CLI credentials."
+          >
+            <span className="text-ink-3 max-w-[220px] text-right text-[12px] leading-[1.45]">
+              Uses your existing CLI login
+            </span>
+          </SettingsRow>
+        </>
+      ) : (
+        <>
+          <div className="border-line flex flex-col gap-2.5 border-b py-[15px]">
+            <Label htmlFor="model-base-url">API base URL</Label>
+            <Input
+              id="model-base-url"
+              value={baseUrlInput}
+              placeholder="https://api.openai.com/v1"
+              onChange={(event) => {
+                setBaseUrlInput(event.target.value);
               }}
-              onClick={() => {
-                setShowKey((prev) => !prev);
-              }}
-            >
-              {showKey ? "Hide" : "Show"}
-            </Button>
-          ) : keyStored ? (
-            <Button variant="link" size="sm" className="h-auto p-0" onClick={removeKey}>
-              Remove
-            </Button>
-          ) : null}
-        </div>
-        <Input
-          id="model-api-key"
-          type={showKey ? "text" : "password"}
-          value={keyInput}
-          placeholder={keyPlaceholder}
-          autoComplete="off"
-          onChange={(event) => {
-            setKeyInput(event.target.value);
-          }}
-          onBlur={saveKey}
-        />
-        <p className="text-ink-3 text-[12px] leading-[1.45]">
-          Stored in your device keychain. Local-mode requests go only to this endpoint, never to
-          Velata.
-        </p>
-      </div>
+              onBlur={persistBaseUrl}
+            />
+          </div>
 
-      <SettingsRow label="Model">
-        <Input
-          className="w-[220px]"
-          value={modelInput}
-          placeholder="glm-4-plus"
-          aria-label="Model"
-          onChange={(event) => {
-            setModelInput(event.target.value);
-          }}
-          onBlur={persistModel}
-        />
-      </SettingsRow>
+          <div className="border-line flex flex-col gap-2.5 border-b py-[15px]">
+            <div className="flex items-baseline justify-between gap-4">
+              <Label htmlFor="model-api-key">API key</Label>
+              {keyInput !== "" ? (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                  }}
+                  onClick={() => {
+                    setShowKey((prev) => !prev);
+                  }}
+                >
+                  {showKey ? "Hide" : "Show"}
+                </Button>
+              ) : keyStored ? (
+                <Button variant="link" size="sm" className="h-auto p-0" onClick={removeKey}>
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+            <Input
+              id="model-api-key"
+              type={showKey ? "text" : "password"}
+              value={keyInput}
+              placeholder={keyPlaceholder}
+              autoComplete="off"
+              onChange={(event) => {
+                setKeyInput(event.target.value);
+              }}
+              onBlur={saveKey}
+            />
+            <p className="text-ink-3 text-[12px] leading-[1.45]">
+              Stored in your device keychain. Local-mode requests go only to this endpoint, never to
+              Velata.
+            </p>
+          </div>
+
+          <SettingsRow label="Model">
+            <Input
+              className="w-[220px]"
+              value={modelInput}
+              placeholder="glm-4-plus"
+              aria-label="Model"
+              onChange={(event) => {
+                setModelInput(event.target.value);
+              }}
+              onBlur={persistModel}
+            />
+          </SettingsRow>
+        </>
+      )}
 
       <SettingsRow label="Connection">
         <span className="text-ink-2 font-mono text-[11px]">{statusLabel(status)}</span>

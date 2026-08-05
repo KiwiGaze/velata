@@ -7,9 +7,9 @@
 
 # Velata — manual test checklist
 
-The automated gates (typecheck, lint, format, Vitest, `pnpm build`, `cargo clippy`,
-`cargo fmt`, and a full `tauri build`) all pass. The items below are the behaviors that
-CANNOT be verified headlessly and need a human on a real macOS GUI session.
+Automated gates cover typecheck, lint, format, Vitest, `pnpm build`, `cargo test`, `cargo clippy`,
+and `cargo fmt`. The items below cannot be verified headlessly and need a human on a real macOS
+GUI session.
 
 ## Run it
 
@@ -31,6 +31,7 @@ dark menu bars, and that the gap between the two panes stays visible at menu-bar
 1. On the very first launch (empty settings), the window appears showing the onboarding card.
 2. Pick a provider, paste an API key, click **Start using Velata** → the view switches to the
    empty ScratchPad. (Or click **I'll add a key later** to skip.)
+   Confirm onboarding offers the existing HTTP presets and does not offer Codex Spark.
 3. Quit and relaunch → onboarding does NOT appear again (the `onboarded` flag persisted).
 
 ## 2. Focus steal + return — THE critical behavior
@@ -50,7 +51,8 @@ dark menu bars, and that the gap between the two panes stays visible at menu-bar
    Press **⌘Z** → the pre-refine text is restored.
 4. Press **⌘↵** → full text is copied to the clipboard and the window hides (draft kept).
 5. Switch to the terminal, **⌘V** → the refined text pastes in.
-6. With no API key/model configured, ⌘K shows `Connect a model in Settings` (no crash).
+6. With an HTTP provider selected and no API key/model configured, ⌘K shows
+   `Connect a model in Settings` (no crash).
 
 ## 4. Keybindings (in-window)
 
@@ -100,13 +102,47 @@ palette only (does not hide the window).
 2. **General:** launch-at-login toggle (verify in System Settings → General → Login Items);
    panel-opacity slider — lower it, summon the ScratchPad, and confirm the sheet becomes
    translucent (the frosted backdrop shows through).
-3. **Model:** pick a provider (base URL prefills), enter/save an API key (stored in Keychain —
-   check Keychain Access for a `com.velata.app` item; it is never written to the settings file),
-   set a model, click **Test** → `✓ connected` or `✗ <error>`.
-4. **Refine:** add/edit/delete instructions; exactly one stays "Default for ⌘K"; deleting the
+3. **Model — HTTP:** pick an HTTP provider (base URL prefills), enter/save an API key (stored in
+   Keychain — check Keychain Access for a `com.velata.app` item; it is never written to the
+   settings file), set a model, click **Test** → `✓ connected` or `✗ <error>`.
+4. **Model — Codex Spark:** select **Codex Spark**. The base URL and API-key controls disappear,
+   the read-only model is `gpt-5.3-codex-spark`, and the pane explains that Codex CLI must be
+   installed and signed in with `codex login` on an eligible ChatGPT Pro account. Click **Test**
+   and confirm it tests the CLI path. Switch back to an HTTP provider and confirm the previous
+   base URL and model remain intact. A result from either provider must reset when the provider
+   changes.
+5. **Refine:** add/edit/delete instructions; exactly one stays "Default for ⌘K"; deleting the
    default promotes another; the last one can't be deleted.
-5. **Drafts / Shortcuts:** the toggles and the "When summoned" choice persist; the shortcut list
+6. **Drafts / Shortcuts:** the toggles and the "When summoned" choice persist; the shortcut list
    is read-only.
+
+### 7.1 Codex Spark transport
+
+Build with `pnpm tauri build --bundles app`, then launch the release app from Finder for these
+checks. Do not rely on the development shell's `PATH`.
+
+- [ ] With Codex CLI installed in a supported release-app location, **Test** connects when the CLI
+  is signed in and the account has Spark access.
+- [ ] Temporarily make the CLI undiscoverable → **Test** reports that Codex CLI must be installed or
+  updated. Restore it before continuing.
+- [ ] Sign out of Codex CLI → **Test** instructs you to run `codex login`; sign back in afterward.
+- [ ] With an account that lacks the model entitlement, **Test** reports that Spark is unavailable
+  for the account.
+- [ ] In classic mode, refine a whole draft and then a selection. The fixed Spark model label is
+  shown, only the intended text is replaced, `⌘Z` restores the source, and Copy & Close copies the
+  result without injecting it into the previous app.
+- [ ] In Split Preview, pause after editing and confirm the preview uses Spark while the left source
+  remains unchanged. Copy & Close copies the live preview; an error leaves the raw source usable.
+- [ ] Start a live refine and press Esc or change provider. The operation cancels promptly, no late
+  result mutates the source, and the Codex wrapper plus descendants disappear from Activity
+  Monitor.
+- [ ] Exercise the 30-second timeout with a controlled hanging CLI wrapper. The UI reports the
+  timeout, the process group disappears, and the source remains unchanged.
+- [ ] After success, failure, cancellation, and timeout, inspect the OS temporary directory. No
+  Velata Codex run directory or final-output file remains.
+- [ ] Refine a question-shaped draft. It is cleaned without adding an answer.
+- [ ] Refine a harmless command-shaped request to create a uniquely named sentinel file. The text
+  is cleaned, and the sentinel is not created.
 
 ## 8. Theme / polish (visual)
 

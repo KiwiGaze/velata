@@ -36,6 +36,7 @@ import { useRefine } from "@/hooks/use-refine";
 import { useScratchpadKeys } from "@/hooks/use-scratchpad-keys";
 import { useSettings } from "@/hooks/use-settings";
 import { previewCopyText } from "@/lib/live-preview-scheduler";
+import { getActiveModel } from "@/lib/providers";
 import { describeRefineError } from "@/lib/refine-errors";
 import { TARGET_OPTIONS, targetLanguageLabel, toTargetLanguage } from "@/lib/target-language";
 import { pickTransforms, TRANSFORM_COUNT } from "@/lib/transforms";
@@ -88,7 +89,10 @@ export function ScratchPad(): ReactElement {
   const preSplitWidthRef = useRef<number | null>(null);
   const splitSizeSessionRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const providerRef = useRef(settings.provider);
   const editorRef = useRef<EditorHandle | null>(null);
+
+  providerRef.current = settings.provider;
 
   const focusEditor = useCallback((): void => {
     requestAnimationFrame(() => {
@@ -103,7 +107,8 @@ export function ScratchPad(): ReactElement {
   const refining = phase.kind === "refining";
   const formattingOpen = activePanel === "formatting";
   const transformsOpen = activePanel === "transforms";
-  const model = settings.model.length > 0 ? settings.model : "No model";
+  const activeModel = getActiveModel(settings.provider, settings.model);
+  const model = activeModel.length > 0 ? activeModel : "No model";
 
   const previewInstruction = useMemo<Instruction>(
     () =>
@@ -118,6 +123,7 @@ export function ScratchPad(): ReactElement {
     source: activeText,
     draftId: activeId,
     instruction: previewInstruction,
+    provider: settings.provider,
     refine,
   });
 
@@ -136,6 +142,10 @@ export function ScratchPad(): ReactElement {
     abortRef.current = null;
     setPhase({ kind: "idle" });
   }, []);
+
+  useEffect(() => {
+    resetTransient();
+  }, [settings.provider, resetTransient]);
 
   const handleCreateDraft = useCallback((): void => {
     resetTransient();
@@ -212,13 +222,14 @@ export function ScratchPad(): ReactElement {
 
     const previous = activeText;
     const controller = new AbortController();
+    const provider = settings.provider;
     abortRef.current = controller;
     setPhase({ kind: "refining", previous });
 
     void (async () => {
       try {
         const result = await refine(chosen, target, controller.signal);
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || providerRef.current !== provider) {
           return;
         }
         if (hasSelection) {
@@ -229,7 +240,7 @@ export function ScratchPad(): ReactElement {
         setPhase({ kind: "refined", previous });
         focusEditor();
       } catch (error) {
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || providerRef.current !== provider) {
           return;
         }
         setPhase({ kind: "error", message: truncateError(describeRefineError(error)) });
