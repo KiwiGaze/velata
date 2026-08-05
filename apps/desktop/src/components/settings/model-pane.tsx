@@ -52,6 +52,7 @@ export function ModelPane(): ReactElement {
   const [modelInput, setModelInput] = useState(settings.model);
   const [keyInput, setKeyInput] = useState("");
   const [keyStored, setKeyStored] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [status, setStatus] = useState<TestStatus>({ kind: "idle" });
   const abortRef = useRef<AbortController | null>(null);
@@ -67,6 +68,7 @@ export function ModelPane(): ReactElement {
 
   useEffect(() => {
     const generation = ++keyOperationGenerationRef.current;
+    setKeyError(null);
     if (settings.provider === CODEX_SPARK_PROVIDER) {
       return;
     }
@@ -78,7 +80,7 @@ export function ModelPane(): ReactElement {
         }
       } catch {
         if (keyOperationGenerationRef.current === generation) {
-          setStatus({ kind: "error", message: KEY_READ_ERROR_MESSAGE });
+          setKeyError(KEY_READ_ERROR_MESSAGE);
         }
       }
     })();
@@ -142,9 +144,7 @@ export function ModelPane(): ReactElement {
     if (keyOperationGenerationRef.current !== generation) {
       return;
     }
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setStatus({ kind: "error", message });
+    setKeyError(message);
     await recoverKeyStored(generation);
   }
 
@@ -153,6 +153,7 @@ export function ModelPane(): ReactElement {
     abortRef.current?.abort();
     abortRef.current = null;
     setStatus({ kind: "idle" });
+    setKeyError(null);
     return generation;
   }
 
@@ -210,7 +211,15 @@ export function ModelPane(): ReactElement {
         }
         let apiKey = keyInput.trim();
         if (apiKey === "") {
-          apiKey = (await getApiKey()) ?? "";
+          try {
+            apiKey = (await getApiKey()) ?? "";
+          } catch {
+            if (!controller.signal.aborted) {
+              setKeyError(KEY_READ_ERROR_MESSAGE);
+              setStatus({ kind: "idle" });
+            }
+            return;
+          }
           if (controller.signal.aborted) {
             return;
           }
@@ -334,6 +343,11 @@ export function ModelPane(): ReactElement {
               Stored in your device keychain. Local-mode requests go only to this endpoint, never to
               Velata.
             </p>
+            {keyError === null ? null : (
+              <span className="text-ink-2 font-mono text-[11px]" role="status" aria-live="polite">
+                ✗ {keyError}
+              </span>
+            )}
           </div>
 
           <SettingsRow label="Model">

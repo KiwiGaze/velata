@@ -227,6 +227,23 @@ describe("ModelPane", () => {
     expect(mocks.testCodexSparkConnection).not.toHaveBeenCalled();
   });
 
+  it("reports a test-time key read failure without treating it as a connection failure", async () => {
+    mocks.getApiKey
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error("native keychain detail"));
+    render();
+    await flush();
+
+    await clickTest();
+    await flush();
+
+    expect(mocks.getApiKey).toHaveBeenCalledTimes(2);
+    expect(mocks.testConnection).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("not tested");
+    expect(container.textContent).not.toContain("testing…");
+    expect(getVisibleErrorText()).toBe("✗ Could not read API key from Keychain.");
+  });
+
   it("clears a previous result and preserves HTTP configuration when Spark is selected", async () => {
     render();
     await clickTest();
@@ -414,6 +431,34 @@ describe("ModelPane", () => {
     await flush();
 
     expect(container.textContent).toContain("connected");
+  });
+
+  it("keeps a newer connection test active while reporting a pending save failure", async () => {
+    const keySave = createDeferred<undefined>();
+    const connection = createDeferred<{ readonly ok: true }>();
+    mocks.setApiKey.mockReturnValue(keySave.promise);
+    mocks.testConnection.mockReturnValue(connection.promise);
+    render();
+
+    const keyInput = container.querySelector<HTMLInputElement>("#model-api-key");
+    if (keyInput === null) {
+      throw new Error("API key input was not rendered");
+    }
+    await blurKeyInput(keyInput, "new-key");
+    await clickTest();
+
+    keySave.reject(new Error("native save detail"));
+    await flush();
+    await flush();
+
+    expect(container.textContent).toContain("testing…");
+    expect(getVisibleErrorText()).toBe("✗ Could not save API key.");
+
+    connection.resolve({ ok: true });
+    await flush();
+
+    expect(container.textContent).toContain("connected");
+    expect(getVisibleErrorText()).toBe("✗ Could not save API key.");
   });
 
   it("reports a failed save while preserving retry and stored-key state", async () => {
