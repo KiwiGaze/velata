@@ -105,6 +105,21 @@ palette only (does not hide the window).
 3. **Model — HTTP:** pick an HTTP provider (base URL prefills), enter/save an API key (stored in
    Keychain — check Keychain Access for a `com.velata.app` item; it is never written to the
    settings file), set a model, click **Test** → `✓ connected` or `✗ <error>`.
+   - **Native Keychain responsiveness:** build the app from the exact diff under review. In
+     Activity Monitor, select that Velata process and start a fresh **Sample Process** immediately
+     after opening this pane. While the sample is still collecting, return to Settings and
+     navigate to **General**, then back to **Model**. Pass only if navigation is immediate and the
+     overlapping sample captures the pending Security.framework Keychain call beneath
+     `tokio::runtime::blocking::pool`. A call beneath
+     `tokio::runtime::scheduler::multi_thread::worker` fails this check. If the lookup finishes
+     before the sample and navigation overlap, record the run as inconclusive and retry when
+     Keychain access is genuinely delayed; a fast completion is not a pass.
+   - Repeat the overlapping sample and pane-navigation check while saving, then removing, a
+     tester-owned disposable credential. Use an isolated macOS test account with no real Velata
+     credential, and confirm the `com.velata.app` item is absent in Keychain Access afterward. Do
+     not overwrite, expose, or remove a real credential. Each operation passes only when its
+     pending Keychain call is captured on the same `tokio::runtime::blocking::pool` path during
+     the responsive interaction; otherwise mark that operation inconclusive.
 4. **Model — Codex Spark:** select **Codex Spark**. The base URL and API-key controls disappear,
    the read-only model is `gpt-5.3-codex-spark`, and the pane explains that Codex CLI must be
    installed and signed in with `codex login` on an eligible ChatGPT Pro account. Click **Test**
