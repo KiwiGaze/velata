@@ -104,7 +104,9 @@ palette only (does not hide the window).
    translucent (the frosted backdrop shows through).
 3. **Model — HTTP:** pick an HTTP provider (base URL prefills), enter/save an API key (stored in
    Keychain — check Keychain Access for a `com.velata.app` item; it is never written to the
-   settings file), set a model, click **Test** → `✓ connected` or `✗ <error>`.
+   settings file), set a model, click **Test** → `✓ connected` or `✗ <error>`. Opening the pane,
+   saving the key, and removing it must leave the window responsive even if macOS delays Keychain
+   access.
 4. **Model — Codex Spark:** select **Codex Spark**. The base URL and API-key controls disappear,
    the read-only model is `gpt-5.3-codex-spark`, and the pane explains that Codex CLI must be
    installed and signed in with `codex login` on an eligible ChatGPT Pro account. Click **Test**

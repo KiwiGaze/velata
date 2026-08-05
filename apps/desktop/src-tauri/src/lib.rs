@@ -76,7 +76,7 @@ fn api_key_entry() -> Result<keyring::Entry, String> {
     keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT).map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn get_api_key() -> Result<Option<String>, String> {
     match api_key_entry()?.get_password() {
         Ok(secret) => Ok(Some(secret)),
@@ -85,14 +85,14 @@ fn get_api_key() -> Result<Option<String>, String> {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn set_api_key(key: String) -> Result<(), String> {
     api_key_entry()?
         .set_password(&key)
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn delete_api_key() -> Result<(), String> {
     match api_key_entry()?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
