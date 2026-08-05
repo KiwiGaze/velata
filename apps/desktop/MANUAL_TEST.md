@@ -7,9 +7,9 @@
 
 # Velata — manual test checklist
 
-Automated gates cover typecheck, lint, format, Vitest, `pnpm build`, `cargo clippy`, and
-`cargo fmt`. The items below cannot be verified headlessly and need a human on a real macOS GUI
-session.
+Automated gates cover typecheck, lint, format, Vitest, `pnpm build`, `cargo test`, `cargo clippy`,
+and `cargo fmt`. The items below cannot be verified headlessly and need a human on a real macOS
+GUI session.
 
 ## Run it
 

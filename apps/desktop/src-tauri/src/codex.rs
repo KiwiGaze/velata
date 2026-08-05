@@ -20,6 +20,7 @@ const CODEX_USER_PROMPT: &str = "Refine the draft provided through stdin.";
 const TOMBSTONE_TTL: Duration = Duration::from_secs(60);
 const MAX_TOMBSTONES: usize = 256;
 const MAX_REQUEST_ID_BYTES: usize = 128;
+const MAX_ACTIVE_RUNS: usize = 4;
 const DISABLED_CODEX_FEATURES: &[&str] = &[
     "shell_tool",
     "unified_exec",
@@ -191,6 +192,9 @@ impl CodexRegistry {
         {
             state.tombstones.remove(index);
             return Err(CodexSparkError::cancelled());
+        }
+        if state.active.len() >= MAX_ACTIVE_RUNS {
+            return Err(execution_failed());
         }
         let run = Arc::new(ActiveRun::new());
         state.active.insert(request_id.to_owned(), Arc::clone(&run));
@@ -2093,6 +2097,47 @@ printf '12345' > "$output"
             .register("request-1", now + TOMBSTONE_TTL + Duration::from_secs(4))
             .is_ok());
         registry.finish("request-1");
+        assert_no_run_directories(directory.path());
+    }
+
+    #[test]
+    fn active_run_limit_rejects_before_process_spawn() {
+        let directory = TestDirectory::new();
+        let marker = directory.path().join("started");
+        let script = write_script(
+            directory.path(),
+            "codex",
+            "touch \"$(dirname \"$0\")/started\"",
+        );
+        let registry = CodexRegistry::default();
+        let now = Instant::now();
+        let active_request_ids = (0..MAX_ACTIVE_RUNS)
+            .map(|index| format!("active-{index}"))
+            .collect::<Vec<_>>();
+        for request_id in &active_request_ids {
+            registry
+                .register(request_id, now)
+                .expect("register active run");
+        }
+
+        let error = run_direct(
+            &registry,
+            script,
+            directory.path(),
+            request("over-limit", "task", "input"),
+        )
+        .expect_err("run over the active limit is rejected");
+
+        assert_eq!(error.code, CodexSparkErrorCode::ExecutionFailed);
+        assert!(!marker.exists());
+        registry.finish(&active_request_ids[0]);
+        registry
+            .register("after-finish", now)
+            .expect("released slot accepts new work");
+        registry.finish("after-finish");
+        for request_id in active_request_ids.iter().skip(1) {
+            registry.finish(request_id);
+        }
         assert_no_run_directories(directory.path());
     }
 
